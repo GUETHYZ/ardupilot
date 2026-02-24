@@ -11,7 +11,7 @@ void Copter::userhook_init()
 #ifdef USERHOOK_FASTLOOP
 void Copter::userhook_FastLoop()
 {
-    // put your 100Hz code here
+    my_LINS313.update();
 }
 #endif
 

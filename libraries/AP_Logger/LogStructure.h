@@ -676,6 +676,33 @@ struct PACKED log_VER {
 };
 
 
+struct PACKED log_LINS313 
+{
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    float   roll;
+    float   pitch;
+    float   yaw;
+};
+
+struct PACKED log_LDC 
+{
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    float lins_roll;
+    float lins_pitch;
+    float lins_yaw;
+    float dcm_roll;
+    float dcm_pitch;
+    float dcm_yaw;
+    float apm_roll;
+    float apm_pitch;
+    float apm_yaw;
+    float error_rp;
+    float error_yaw;
+};
+
+
 // FMT messages define all message formats other than FMT
 // UNIT messages define units which can be referenced by FMTU messages
 // FMTU messages associate types (e.g. centimeters/second/second) to FMT message fields
@@ -1223,6 +1250,10 @@ struct PACKED log_VER {
       "MULT", "Qbd",      "TimeUS,Id,Mult", "s--","F--" },   \
     { LOG_PARAMETER_MSG, sizeof(log_Parameter), \
      "PARM", "QNff",        "TimeUS,Name,Value,Default", "s---", "F---"  },       \
+    { LOG_LINS313_MSG, sizeof(log_LINS313), \
+      "LINS",  "Qfff",      "TimeUS,Roll,Pitch,Yaw", "sddd", "FBBB" },\
+    { LOG_LDC_MSG, sizeof(log_LDC), \
+      "LDC",  "Qfffffffffff",      "TimeUS,LRoll,LPitch,LYaw,DRoll,DPitch,DYaw,ARoll,APitch,AYaw,Errorrp,Erroryaw", "sddddddddddd", "FBBBBBBBBBBB" },\
 LOG_STRUCTURE_FROM_GPS \
     { LOG_MESSAGE_MSG, sizeof(log_Message), \
       "MSG",  "QZ",     "TimeUS,Message", "s-", "F-"}, \
@@ -1425,6 +1456,9 @@ enum LogMessages : uint8_t {
     LOG_RCOUT2_MSG,
     LOG_RCOUT3_MSG,
     LOG_IDS_FROM_FENCE,
+
+    LOG_LINS313_MSG,
+    LOG_LDC_MSG,
 
     _LOG_LAST_MSG_
 };

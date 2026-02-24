@@ -587,7 +587,17 @@ void AP_SerialManager::init()
                                          AP_SERIALMANAGER_PPP_BUFSIZE_TX);
                     break;
 #endif
-                    
+                   
+case SerialProtocol_MY_LINS313:
+    // 设置波特率、流控制等参数
+                   uart->begin(state[i].baudrate(),
+                                         1024,
+                                         64);
+                    uart->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
+                    break;
+
+
+
                 default:
                     uart->begin(state[i].baudrate());
             }

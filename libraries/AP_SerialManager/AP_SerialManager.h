@@ -82,6 +82,10 @@ public:
         SerialProtocol_IMUOUT = 46,
         // Reserving Serial Protocol 47 for SerialProtocol_IQ
         SerialProtocol_PPP = 48,
+
+        //此处添加
+        SerialProtocol_MY_LINS313 = 49,
+
         SerialProtocol_NumProtocols                    // must be the last value
     };
 

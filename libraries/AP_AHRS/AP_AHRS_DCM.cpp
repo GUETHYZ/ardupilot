@@ -717,7 +717,7 @@ AP_AHRS_DCM::drift_correction(float deltat)
 
         // add in wind estimate
         velocity += _wind;
-
+        //引入GPS进行yaw角矫正
         last_correction_time = AP_HAL::millis();
         _have_gps_lock = false;
     } else {
@@ -747,6 +747,7 @@ AP_AHRS_DCM::drift_correction(float deltat)
 
     if (have_gps()) {
         // use GPS for positioning with any fix, even a 2D fix
+        
         _last_lat = _gps.location().lat;
         _last_lng = _gps.location().lng;
         _last_pos_ms = AP_HAL::millis();
@@ -761,7 +762,7 @@ AP_AHRS_DCM::drift_correction(float deltat)
         _position_offset_north += velocity.x * _ra_deltat;
         _position_offset_east  += velocity.y * _ra_deltat;
     }
-
+    
     // see if this is our first time through - in which case we
     // just setup the start times and return
     if (_ra_sum_start == 0) {

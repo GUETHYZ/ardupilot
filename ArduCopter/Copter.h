@@ -73,6 +73,8 @@
 #include <AP_OpticalFlow/AP_OpticalFlow.h>
 #include <AP_Winch/AP_Winch_config.h>
 
+#include <my_ins313/LINS313.h>
+
 // Configuration
 #include "defines.h"
 #include "config.h"
@@ -251,6 +253,9 @@ private:
     RC_Channel *channel_pitch;
     RC_Channel *channel_throttle;
     RC_Channel *channel_yaw;
+
+    MY_LINS313 my_LINS313;
+
 
 #if HAL_LOGGING_ENABLED
     AP_Logger logger;

@@ -265,7 +265,7 @@ elif [ ${RELEASE_CODENAME} == 'lunar' ]; then
     SITL_PKGS+=" libpython3-stdlib" # for argparse
 elif [ ${RELEASE_CODENAME} == 'buster' ]; then
     SITL_PKGS+=" libpython3-stdlib" # for argparse
-elif [ ${RELEASE_CODENAME} != 'mantic' ]; then
+elif [ ${RELEASE_CODENAME} == 'focal' ] || [ ${RELEASE_CODENAME} == 'buster' ]; then
   SITL_PKGS+=" python-argparse"
 fi
 
@@ -346,8 +346,9 @@ PIP_USER_ARGUMENT="--user"
 
 # create a Python venv on more recent releases:
 if [ ${RELEASE_CODENAME} == 'lunar' ] ||
-   [ ${RELEASE_CODENAME} == 'mantic' ]; then
-    $APT_GET install python3.11-venv
+   [ ${RELEASE_CODENAME} == 'mantic' ]||
+   [ ${RELEASE_CODENAME} == 'noble' ]; then
+    $APT_GET install python3.12-venv
     python3 -m venv $HOME/venv-ardupilot
 
     # activate it:
