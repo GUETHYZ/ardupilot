@@ -83,7 +83,7 @@ const AP_Param::GroupInfo AP_AHRS::var_info[] = {
     // @Range: 0.1 0.4
     // @Increment: .01
     // @User: Advanced
-    AP_GROUPINFO("RP_P",  5,    AP_AHRS, _kp, 0.4f),
+    AP_GROUPINFO("RP_P",  5,    AP_AHRS, _kp, 0.25f),
 
     // @Param: WIND_MAX
     // @DisplayName: Maximum wind
