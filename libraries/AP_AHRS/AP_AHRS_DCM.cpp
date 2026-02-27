@@ -156,6 +156,7 @@ void AP_AHRS_DCM::matrix_update(void)
         _omega = delta_angle / dangle_dt;
         _omega += _omega_I;
         _dcm_matrix.rotate((_omega + _omega_P + _omega_yaw_P) * dangle_dt);
+        normalize();
     }
 
     // now update _omega from the filtered value from the primary IMU. We need to use
@@ -167,6 +168,7 @@ void AP_AHRS_DCM::matrix_update(void)
     // the _P_gain() calculation, which can lead to a very large P
     // value
     _omega = _ins.get_gyro() + _omega_I;
+    normalize();
 }
 
 
