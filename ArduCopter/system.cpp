@@ -1,5 +1,6 @@
 #include "Copter.h"
 #include <AP_ESC_Telem/AP_ESC_Telem.h>
+#include <my_ins313/LINS313.h>
 
 /*****************************************************************************
 *   The init_ardupilot function processes everything we need for an in - air restart
@@ -116,6 +117,10 @@ void Copter::init_ardupilot()
 #if AP_CAMERA_ENABLED
     // initialise camera
     camera.init();
+#endif
+
+#if MY_LINS313_ENABLED
+    my_LINS313.init();
 #endif
 
 #if AC_PRECLAND_ENABLED
