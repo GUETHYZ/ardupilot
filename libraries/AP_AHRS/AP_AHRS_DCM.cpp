@@ -400,8 +400,10 @@ AP_AHRS_DCM::_P_gain(float spin_rate)
     if (spin_rate < ToRad(50)) {
         return 1.0f;
     }
+    //针对快速旋转择场景进行优化，当旋转速率超过500度/秒时，直接返回一个较大的增益值，以快速响应旋转变化，避免过度依赖陀螺仪积分导致的误差积累
     if (spin_rate > ToRad(500)) {
-        return 10.0f;
+        // return 10.0f;
+        return 15.0f;
     }
     return spin_rate/ToRad(50);
 }
