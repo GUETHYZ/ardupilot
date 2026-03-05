@@ -596,7 +596,13 @@ case SerialProtocol_MY_LINS313:
                     uart->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
                     break;
 
-
+case SerialProtocol_LINS313_SEND:
+    // 设置波特率、流控制等参数
+                   uart->begin(state[i].baudrate(),
+                                         64,
+                                         1024);
+                    uart->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
+                    break;
 
                 default:
                     uart->begin(state[i].baudrate());

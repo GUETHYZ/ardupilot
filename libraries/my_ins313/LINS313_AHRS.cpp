@@ -4,8 +4,11 @@
 #include <AP_InertialSensor/AP_InertialSensor.h>
 #include <GCS_MAVLink/GCS.h>
 #include <AP_Math/definitions.h>
+#include <AP_AHRS/AP_AHRS_DCM.h>
 
 extern const AP_HAL::HAL& hal;
+
+float roll_from_apm_dcm_no_gps, pitch_from_apm_dcm_no_gps, yaw_from_apm_dcm_no_gps;
 
 LINS313_AHRS::LINS313_AHRS() :
     _initialized(false),
@@ -347,21 +350,22 @@ void LINS313_AHRS::get_euler_angles(float &roll_rad, float &pitch_rad, float &ya
     yaw_rad = _yaw_rad;
 }
 
-void LINS313_AHRS::get_comparison_data(ComparisonData &data)
+void LINS313_AHRS::get_comparison_data(ComparisonData &data) const
 {
     data.time_us = AP_HAL::micros64();
     data.lins_roll_deg = _lins_roll_deg;
     data.lins_pitch_deg = _lins_pitch_deg;
     data.lins_yaw_deg = _lins_yaw_deg;
     
+    //这里自己写的DCM预测无用
     data.dcm_roll_deg = degrees(_roll_rad);
     data.dcm_pitch_deg = degrees(_pitch_rad);
     data.dcm_yaw_deg = degrees(_yaw_rad);
     
-    // 获取APM飞控姿态 - 使用公共getter函数
-    data.apm_roll_deg = degrees(AP::ahrs().get_roll());
-    data.apm_pitch_deg = degrees(AP::ahrs().get_pitch());
-    data.apm_yaw_deg = degrees(AP::ahrs().get_yaw());
+    // 获取APM飞控的DCM姿态 - 使用公共getter函数
+    data.apm_roll_deg = degrees(roll_from_apm_dcm_no_gps);
+    data.apm_pitch_deg = degrees(pitch_from_apm_dcm_no_gps);
+    data.apm_yaw_deg = degrees(yaw_from_apm_dcm_no_gps);
     
     data.error_rp = _error_rp;
     data.error_yaw = _error_yaw;
@@ -370,13 +374,10 @@ void LINS313_AHRS::get_comparison_data(ComparisonData &data)
 void LINS313_AHRS::log_comparison(uint64_t time_us)
 {
 #if HAL_LOGGING_ENABLED
-    if (!_initialized) return;
     
     ComparisonData data;
     get_comparison_data(data);
-    
 
-    
     struct log_LDC pkt = {
         LOG_PACKET_HEADER_INIT(LOG_LDC_MSG), // 初始化包头
         time_us       : AP_HAL::micros64(),         // 当前时间戳

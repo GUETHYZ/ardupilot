@@ -27,6 +27,7 @@
 
 #include "AP_AHRS_Backend.h"
 
+extern float roll_from_apm_dcm_no_gps, pitch_from_apm_dcm_no_gps, yaw_from_apm_dcm_no_gps;
 class AP_AHRS_DCM : public AP_AHRS_Backend {
 public:
 
@@ -130,6 +131,10 @@ public:
     bool yaw_source_available(void) const;
 
     void get_control_limits(float &ekfGndSpdLimit, float &controlScaleXY) const override;
+
+    float get_roll_from_313_and_apm(float get_roll_313) const { return get_roll_313; };
+    float get_pitch_from_313_and_apm(float get_pitch_313) const { return get_pitch_313; };
+    float get_yaw_from_313_and_apm(float get_yaw_313) const { return get_yaw_313; };
 
 private:
 

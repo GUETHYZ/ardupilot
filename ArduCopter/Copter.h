@@ -74,6 +74,7 @@
 #include <AP_Winch/AP_Winch_config.h>
 
 #include <my_ins313/LINS313.h>
+#include <my_ins313/LINS313_SEND.h>
 
 // Configuration
 #include "defines.h"
@@ -255,6 +256,7 @@ private:
     RC_Channel *channel_yaw;
 
     MY_LINS313 my_LINS313;
+    MY_LINS313_SEND my_LINS313_send;
 
 
 #if HAL_LOGGING_ENABLED

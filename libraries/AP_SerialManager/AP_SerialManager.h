@@ -85,6 +85,7 @@ public:
 
         //此处添加
         SerialProtocol_MY_LINS313 = 49,
+        SerialProtocol_LINS313_SEND = 50,
 
         SerialProtocol_NumProtocols                    // must be the last value
     };

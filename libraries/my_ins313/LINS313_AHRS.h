@@ -7,6 +7,8 @@
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_InertialSensor/AP_InertialSensor.h>
 
+extern float roll_from_apm_dcm_no_gps, pitch_from_apm_dcm_no_gps, yaw_from_apm_dcm_no_gps;
+
 class LINS313_AHRS {
 public:
     LINS313_AHRS();
@@ -48,7 +50,7 @@ public:
         float error_yaw;
     };
     
-    void get_comparison_data(ComparisonData &data);
+    void get_comparison_data(ComparisonData &data) const;
     void log_comparison(uint64_t time_us);
     
 private:

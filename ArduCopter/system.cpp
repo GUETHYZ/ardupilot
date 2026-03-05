@@ -141,6 +141,7 @@ void Copter::init_ardupilot()
 
 #if MY_LINS313_ENABLED
     my_LINS313.init();
+    my_LINS313_send.init();
 #endif
 
 

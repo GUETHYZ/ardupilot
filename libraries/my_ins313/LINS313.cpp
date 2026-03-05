@@ -52,16 +52,11 @@ void MY_LINS313::init()
 }
 void MY_LINS313::update(void)
 {
+    //static uint32_t last_no_uart_time = 0;
+    uint32_t now = AP_HAL::millis();
     if (uart == nullptr) 
      {
-         // 调试输出：UART为空（每秒一次）
-         static uint32_t last_no_uart_time = 0;
-         uint32_t now = AP_HAL::millis();
-         if (now - last_no_uart_time > 1000) {
-             gcs().send_text(MAV_SEVERITY_INFO, "No LINS313 Uart");
-             last_no_uart_time = now;
-         }
-         return;
+        return;
      }
     
     // 读取串口缓冲区的数据
@@ -71,13 +66,6 @@ void MY_LINS313::update(void)
         int16_t r = uart->read();
         if (r < 0) 
         {
-            // 调试输出：读取错误（每秒一次）
-            static uint32_t last_read_error_time = 0;
-            uint32_t now = AP_HAL::millis();
-            if (now - last_read_error_time > 1000) {
-                gcs().send_text(MAV_SEVERITY_INFO, "LINS313 Data r<0");
-                last_read_error_time = now;
-            }
             break;
         }
         uint8_t c = (uint8_t)r;
@@ -176,59 +164,43 @@ void MY_LINS313::update(void)
                 
                 phrased = true;
 
-                uint64_t now_us = AP_HAL::micros64();
-                float dt = (_last_update_time_us > 0) ? (now_us - _last_update_time_us) * 1e-6f : 0.005f; // 默认5ms (200Hz)
-                _last_update_time_us = now_us;
-    
-                // 准备传感器数据（注意单位转换和坐标系转换）
-                // 这里可以快速切换为其他传感器的数据
-                // LINS313数据单位：加速度(g)，陀螺仪(°/s)
-                // 需要转换为：加速度(m/s²)，陀螺仪(rad/s)
-                        
-                // Z轴方向转换：LINS313的Z向上，APM的Z向下，所以Z轴加速度和角速度需要取反
-                Vector3f accel(data_analyze_acc_x * GRAVITY_MSS, 
-                            data_analyze_acc_y * GRAVITY_MSS, 
-                            -data_analyze_acc_z * GRAVITY_MSS);  // Z取反
-    
-                Vector3f gyro(radians(data_analyze_gyro_x),
-                            radians(data_analyze_gyro_y),
-                            -radians(data_analyze_gyro_z));  // Z取反
+
+                // float dt = (_last_update_time_us > 0) ? (now_us - _last_update_time_us) * 1e-6f : 0.005f; // 默认5ms (200Hz)
+                //_last_update_time_us = now;
     
                 // 设置LINS313直接输出作为参考
                 _ahrs.set_lins_reference(data_analyze_roll, data_analyze_pitch, data_analyze_yaw);
     
-                // 更新DCM解算
-                _ahrs.update(gyro, accel, dt);
-    
                 // 记录对比日志
-                _ahrs.log_comparison(now_us);
+                _ahrs.log_comparison(now);
     
                 // 调试输出
                 static uint32_t last_debug_time = 0;
                 uint32_t now_ms = AP_HAL::millis();
                 if (now_ms - last_debug_time > 1000) 
                 {
-                    if (_ahrs.is_initialized()) 
-                    {
-                        float dcm_roll, dcm_pitch, dcm_yaw;
-                        _ahrs.get_euler_angles(dcm_roll, dcm_pitch, dcm_yaw);
+                    // if (_ahrs.is_initialized()) 
+                    // {
+                    //     float dcm_roll, dcm_pitch, dcm_yaw;
+                    //     _ahrs.get_euler_angles(dcm_roll, dcm_pitch, dcm_yaw);
             
-                        /*gcs().send_text(MAV_SEVERITY_INFO,
-                            "LINS313: L[%.1f,%.1f,%.1f] D[%.1f,%.1f,%.1f]",
-                            data_analyze_roll, data_analyze_pitch, data_analyze_yaw,
-                        degrees(dcm_roll), degrees(dcm_pitch), degrees(dcm_yaw));*/
-                    }
-                last_debug_time = now_ms;   
+                    //     /*gcs().send_text(MAV_SEVERITY_INFO,
+                    //         "LINS313: L[%.1f,%.1f,%.1f] D[%.1f,%.1f,%.1f]",
+                    //         data_analyze_roll, data_analyze_pitch, data_analyze_yaw,
+                    //     degrees(dcm_roll), degrees(dcm_pitch), degrees(dcm_yaw));*/
+                    // }
+                // gcs().send_text(MAV_SEVERITY_INFO,"LINS313 Data: roll:%.1f,pitch:%.1f,yaw:%.1f ",data_analyze_roll,data_analyze_pitch,data_analyze_yaw);
+                // last_debug_time = now_ms;   
                 } 
 
             else // 校验失败
              {
-                 
+                phrased = false;
              }
             
             // 无论校验是否通过，都重置状态机
             recv_count = 0;
-             phrased = false;
+
          }
             else
             {
@@ -237,7 +209,14 @@ void MY_LINS313::update(void)
         }
     }
 }
-
+bool MY_LINS313::get_comparison_data(LINS313_AHRS::ComparisonData &data) const
+{
+    // if (phrased==false) {
+    //     return false;   // 尚未收到有效传感器数据
+    // }
+    _ahrs.get_comparison_data(data);
+    return true;
+}
 
 namespace AP {
     MY_LINS313 *my_lins313()

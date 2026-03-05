@@ -102,6 +102,11 @@ AP_AHRS_DCM::update()
     // remember the last origin for fallback support
     IGNORE_RETURN(AP::ahrs().get_origin(last_origin));
 
+    roll_from_apm_dcm_no_gps = roll;
+    pitch_from_apm_dcm_no_gps = pitch;
+    yaw_from_apm_dcm_no_gps = yaw;
+
+
 #if HAL_LOGGING_ENABLED
     const uint32_t now_ms = AP_HAL::millis();
     if (now_ms - last_log_ms >= 100) {
@@ -116,6 +121,11 @@ AP_AHRS_DCM::update()
                                     degrees(pitch),
                                     wrap_360(degrees(yaw)));
     }
+    roll_from_apm_dcm_no_gps = roll;
+    pitch_from_apm_dcm_no_gps = pitch;
+    yaw_from_apm_dcm_no_gps = yaw;
+
+
 #endif // HAL_LOGGING_ENABLED
 }
 
@@ -156,6 +166,7 @@ void AP_AHRS_DCM::matrix_update(void)
         _omega = delta_angle / dangle_dt;
         _omega += _omega_I;
         _dcm_matrix.rotate((_omega + _omega_P + _omega_yaw_P) * dangle_dt);
+        //增加正则化，维护矩阵的正交性，防止数值误差积累导致矩阵失效
         normalize();
     }
 
@@ -168,6 +179,7 @@ void AP_AHRS_DCM::matrix_update(void)
     // the _P_gain() calculation, which can lead to a very large P
     // value
     _omega = _ins.get_gyro() + _omega_I;
+    //维持矩阵的正交性，防止数值误差积累导致矩阵失效
     normalize();
 }
 

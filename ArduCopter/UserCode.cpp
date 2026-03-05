@@ -12,6 +12,7 @@ void Copter::userhook_init()
 void Copter::userhook_FastLoop()
 {
     my_LINS313.update();
+    my_LINS313_send.update();
 }
 #endif
 

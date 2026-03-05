@@ -37,6 +37,8 @@ public:
     float get_pitch() const { return data_analyze_pitch; }
     float get_yaw() const { return data_analyze_yaw; }
     bool is_data_valid() const { return phrased; }
+    // 获取对比数据（从 _ahrs 获取）
+    bool get_comparison_data(LINS313_AHRS::ComparisonData &data) const;
 
 private:
     static MY_LINS313 *_singleton;
