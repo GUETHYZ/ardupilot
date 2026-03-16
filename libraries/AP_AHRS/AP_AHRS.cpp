@@ -676,6 +676,7 @@ void AP_AHRS::update_EKF3(void)
             Vector3f &abias = state.accel_bias;
             EKF3.getAccelBias(-1,abias);
 
+            
             // use the primary IMU for accel earth frame
             Vector3f accel = _ins.get_accel(primary_accel);
             accel -= abias;

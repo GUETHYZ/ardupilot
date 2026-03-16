@@ -109,6 +109,18 @@ void Plane::init_ardupilot()
     g2.landing_gear.init();
 #endif
 
+#if MY_LINS313_ENABLED
+    my_LINS313.init();
+    my_LINS313_send.init();
+#endif
+
+#if GPS_RECEIVE_ENABLED
+    gps_receive.init();
+    gps_send.init();
+#endif
+
+
+
 #if FENCE_TRIGGERED_PIN > 0
     hal.gpio->pinMode(FENCE_TRIGGERED_PIN, HAL_GPIO_OUTPUT);
     hal.gpio->write(FENCE_TRIGGERED_PIN, 0);

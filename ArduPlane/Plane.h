@@ -123,6 +123,12 @@
 #endif
 #include "AP_Arming.h"
 
+
+#include <my_ins313/LINS313.h>
+#include <my_ins313/LINS313_SEND.h>
+#include <my_ins313/GPS_RECEIVE.h>
+#include <my_ins313/GPS_SEND.h>
+
 /*
   main APM:Plane class
  */
@@ -201,6 +207,12 @@ private:
 #if HAL_LOGGING_ENABLED
     AP_Logger logger;
 #endif
+
+    //my_lins313相关
+    MY_LINS313 my_LINS313;
+    MY_LINS313_SEND my_LINS313_send;
+    GPS_RECEIVE gps_receive;
+    GPS_SEND gps_send;
 
     // scaled roll limit based on pitch
     int32_t roll_limit_cd;
@@ -981,6 +993,9 @@ private:
     // update current_loc
     void update_current_loc(void);
 
+    // 添加user_hook_loop
+    void userhook_FastLoop(void);
+
     // set home location and store it persistently:
     bool set_home_persistently(const Location &loc) WARN_IF_UNUSED;
 
@@ -1267,6 +1282,9 @@ public:
     // allow for landing descent rate to be overridden by a script, may be -ve to climb
     bool set_land_descent_rate(float descent_rate) override;
 #endif // AP_SCRIPTING_ENABLED
+
+
+
 
 };
 

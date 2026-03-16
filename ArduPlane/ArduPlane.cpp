@@ -144,6 +144,9 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
 #if AC_PRECLAND_ENABLED
     SCHED_TASK(precland_update, 400, 50, 160),
 #endif
+
+    SCHED_TASK(userhook_FastLoop, 200, 100, 157),
+
 };
 
 void Plane::get_scheduler_tasks(const AP_Scheduler::Task *&tasks,
@@ -975,5 +978,14 @@ void Plane::precland_update(void)
     return g2.precland.update(rangefinder_state.height_estimate*100, rangefinder_state.in_range);
 }
 #endif
+
+void Plane::userhook_FastLoop(void)
+{
+    my_LINS313.update();
+    //my_LINS313_send.update();
+    gps_receive.update();
+    gps_send.update();
+}
+
 
 AP_HAL_MAIN_CALLBACKS(&plane);

@@ -167,7 +167,7 @@ void AP_AHRS_DCM::matrix_update(void)
         _omega += _omega_I;
         _dcm_matrix.rotate((_omega + _omega_P + _omega_yaw_P) * dangle_dt);
         //增加正则化，维护矩阵的正交性，防止数值误差积累导致矩阵失效
-        normalize();
+        //normalize();
     }
 
     // now update _omega from the filtered value from the primary IMU. We need to use
@@ -180,7 +180,7 @@ void AP_AHRS_DCM::matrix_update(void)
     // value
     _omega = _ins.get_gyro() + _omega_I;
     //维持矩阵的正交性，防止数值误差积累导致矩阵失效
-    normalize();
+    //normalize();
 }
 
 
@@ -402,8 +402,8 @@ AP_AHRS_DCM::_P_gain(float spin_rate)
     }
     //针对快速旋转择场景进行优化，当旋转速率超过500度/秒时，直接返回一个较大的增益值，以快速响应旋转变化，避免过度依赖陀螺仪积分导致的误差积累
     if (spin_rate > ToRad(500)) {
-        // return 10.0f;
-        return 15.0f;
+        return 10.0f;
+        //return 15.0f;
     }
     return spin_rate/ToRad(50);
 }

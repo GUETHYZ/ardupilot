@@ -396,8 +396,8 @@ void LINS313_AHRS::log_comparison(uint64_t time_us)
         error_rp      : data.error_rp,
         error_yaw     : data.error_yaw,
         };
-     AP::logger().WriteBlock(&pkt, sizeof(pkt));
-
+    AP::logger().WriteBlock(&pkt, sizeof(pkt));
+    
 
 
 #endif
