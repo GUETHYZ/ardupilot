@@ -61,7 +61,7 @@ void LINS313_AHRS::log_comparison(uint64_t time_us)
     
     ComparisonData data;
     get_comparison_data(data);
-    
+
     
     struct log_LDC pkt = {
         LOG_PACKET_HEADER_INIT(LOG_LDC_MSG), // 初始化包头

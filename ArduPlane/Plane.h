@@ -123,6 +123,11 @@
 #include "AP_Arming.h"
 #include "pullup.h"
 
+#include <my_ins313/GPS_RECEIVE.h>
+#include <my_ins313/GPS_SEND.h>
+#include <my_ins313/LINS313.h>
+
+
 /*
   main APM:Plane class
  */
@@ -201,6 +206,11 @@ private:
     RC_Channel *channel_rudder;
     RC_Channel *channel_flap;
     RC_Channel *channel_airbrake;
+
+    MY_LINS313 my_LINS313;
+    GPS_RECEIVE gps_receive;
+    GPS_SEND gps_send;
+
 
     // scaled roll limit based on pitch
     int32_t roll_limit_cd;
@@ -1030,6 +1040,10 @@ private:
 
     // update current_loc
     void update_current_loc(void);
+
+    // 添加user_hook_loop
+    void userhook_FastLoop(void);
+
 
     // set home location and store it persistently:
     bool set_home_persistently(const Location &loc) WARN_IF_UNUSED;

@@ -142,6 +142,9 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
 #if AP_QUICKTUNE_ENABLED
     SCHED_TASK(update_quicktune, 40, 100, 163),
 #endif
+
+    SCHED_TASK(userhook_FastLoop, 200, 100, 157),
+
 };
 
 void Plane::get_scheduler_tasks(const AP_Scheduler::Task *&tasks,
@@ -1071,5 +1074,13 @@ void Plane::update_quicktune(void)
     quicktune.update(control_mode->supports_quicktune());
 }
 #endif
+
+void Plane::userhook_FastLoop(void)
+{
+    my_LINS313.update();
+    //my_LINS313_send.update();
+}
+
+
 
 AP_HAL_MAIN_CALLBACKS(&plane);

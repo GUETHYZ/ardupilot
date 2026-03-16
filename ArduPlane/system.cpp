@@ -86,6 +86,15 @@ void Plane::init_ardupilot()
     camera.init();
 #endif
 
+#if MY_LINS313_ENABLED
+    my_LINS313.init();
+   // my_LINS313_send.init();
+    gps_send.init();
+    gps_receive.init();
+#endif
+
+
+
 #if AP_LANDINGGEAR_ENABLED
     // initialise landing gear position
     g2.landing_gear.init();

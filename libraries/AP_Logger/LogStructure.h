@@ -677,6 +677,27 @@ struct PACKED log_LDC
     float error_rp;
     float error_yaw;
 };
+struct PACKED log_GPEK
+{
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+
+    float test_n;
+    float test_e;
+    float test_d;
+
+    float main_n;
+    float main_e;
+    float main_d;
+
+    float dpos_n;
+    float dpos_e;
+    float dpos_d;
+
+    float dvel_n;
+    float dvel_e;
+    float dvel_d;
+};
 
 // FMT messages define all message formats other than FMT
 // UNIT messages define units which can be referenced by FMTU messages
@@ -1194,11 +1215,12 @@ struct PACKED log_LDC
     { LOG_MULT_MSG, sizeof(log_Format_Multiplier), \
       "MULT", "Qbd",      "TimeUS,Id,Mult", "s--","F--" },   \
     { LOG_PARAMETER_MSG, sizeof(log_Parameter), \
-     "PARM", "QNff",        "TimeUS,Name,Value,Default", "s---", "F---"  },       \
+      "PARM", "QNff",        "TimeUS,Name,Value,Default", "s---", "F---"  },       \
     { LOG_LINS313_MSG, sizeof(log_LINS313), \
       "LINS",  "Qfff",      "TimeUS,Roll,Pitch,Yaw", "sddd", "FBBB" },\
     { LOG_LDC_MSG, sizeof(log_LDC), \
       "LDC",  "Qfffffffffff",      "TimeUS,LRoll,LPitch,LYaw,DRoll,DPitch,DYaw,ARoll,APitch,AYaw,Errorrp,Erroryaw", "sddddddddddd", "FBBBBBBBBBBB" },\
+    { LOG_GPEK_MSG, sizeof(log_GPEK), "GPEK", "Qffffffffffff", "TimeUS,TN,TE,TD,MN,ME,MD,DN,DE,DD,DVN,DVE,DVD", "s------------", "F------------" }, \
     LOG_STRUCTURE_FROM_GPS \
     { LOG_MESSAGE_MSG, sizeof(log_Message), \
       "MSG",  "QZ",     "TimeUS,Message", "s-", "F-"}, \
@@ -1400,6 +1422,8 @@ enum LogMessages : uint8_t {
 
     LOG_LINS313_MSG, 
     LOG_LDC_MSG, 
+
+    LOG_GPEK_MSG,
 
     _LOG_LAST_MSG_
 };

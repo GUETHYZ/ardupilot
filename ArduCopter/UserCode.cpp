@@ -12,6 +12,8 @@ void Copter::userhook_init()
 void Copter::userhook_FastLoop()
 {
     my_LINS313.update();
+    gps_receive.update();
+    gps_send.update();
 }
 #endif
 

@@ -74,6 +74,8 @@
 #include <AP_SurfaceDistance/AP_SurfaceDistance.h>
 
 #include <my_ins313/LINS313.h>
+#include <my_ins313/GPS_SEND.h>
+#include <my_ins313/GPS_RECEIVE.h>
 
 // Configuration
 #include "defines.h"
@@ -251,6 +253,8 @@ private:
     RC_Channel *channel_yaw;
 
     MY_LINS313 my_LINS313;
+    GPS_SEND gps_send;
+    GPS_RECEIVE gps_receive;
 
     // flight modes convenience array
     AP_Int8 *flight_modes;
