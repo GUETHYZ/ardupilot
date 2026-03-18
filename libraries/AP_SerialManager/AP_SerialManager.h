@@ -84,8 +84,8 @@ public:
         SerialProtocol_PPP = 48,
 
         //此处添加
-        SerialProtocol_MY_LINS313 = 49,
-        SerialProtocol_LINS313_SEND = 50,
+        SerialProtocol_FAKE_GPS = 49,
+        SerialProtocol_MESSAGE_RT = 50,
 
         SerialProtocol_NumProtocols                    // must be the last value
     };

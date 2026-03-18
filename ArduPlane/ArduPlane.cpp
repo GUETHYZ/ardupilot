@@ -981,7 +981,7 @@ void Plane::precland_update(void)
 
 void Plane::userhook_FastLoop(void)
 {
-    my_LINS313.update();
+    //my_LINS313.update();
     //my_LINS313_send.update();
     gps_receive.update();
     gps_send.update();

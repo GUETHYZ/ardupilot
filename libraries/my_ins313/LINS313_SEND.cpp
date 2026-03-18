@@ -14,7 +14,7 @@ void MY_LINS313_SEND::init()
 {
 
     auto &sm = AP::serialmanager();
-    uart = sm.find_serial(AP_SerialManager::SerialProtocol_LINS313_SEND, 0);
+    uart = sm.find_serial(AP_SerialManager::SerialProtocol_MESSAGE_RT, 0);
 
     if (uart == nullptr) {
         // 调试输出：未找到串口

@@ -588,18 +588,18 @@ void AP_SerialManager::init()
                     break;
 #endif
                    
-case SerialProtocol_MY_LINS313:
+case SerialProtocol_FAKE_GPS:
     // 设置波特率、流控制等参数
                    uart->begin(state[i].baudrate(),
                                          1024,
-                                         64);
+                                         512);
                     uart->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
                     break;
 
-case SerialProtocol_LINS313_SEND:
+case SerialProtocol_MESSAGE_RT:
     // 设置波特率、流控制等参数
                    uart->begin(state[i].baudrate(),
-                                         64,
+                                         512,
                                          1024);
                     uart->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
                     break;

@@ -110,8 +110,8 @@ void Plane::init_ardupilot()
 #endif
 
 #if MY_LINS313_ENABLED
-    my_LINS313.init();
-    my_LINS313_send.init();
+    //my_LINS313.init();
+    //my_LINS313_send.init();
 #endif
 
 #if GPS_RECEIVE_ENABLED
