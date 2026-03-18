@@ -89,8 +89,8 @@ void GPS_RECEIVE::update(void)
                     static uint32_t last_print_ms = 0;
                     uint32_t now_ms = AP_HAL::millis();
                     if (now_ms - last_print_ms >= 1000) {  // 每秒打印一次
-                        gcs().send_text(MAV_SEVERITY_INFO, "GPS_RECEIVE: lat=%.7f lon=%.7f alt=%.2f", lat, lon, alt);
-                        gcs().send_text(MAV_SEVERITY_INFO, "GPS_RECEIVE: velN=%.2f velE=%.2f velD=%.2f", velN, velE, velD);
+                        //gcs().send_text(MAV_SEVERITY_INFO, "GPS_RECEIVE: lat=%.7f lon=%.7f alt=%.2f", lat, lon, alt);
+                        //gcs().send_text(MAV_SEVERITY_INFO, "GPS_RECEIVE: velN=%.2f velE=%.2f velD=%.2f", velN, velE, velD);
                         last_print_ms = now_ms;
                     }
                     log_compare(AP_HAL::micros64());

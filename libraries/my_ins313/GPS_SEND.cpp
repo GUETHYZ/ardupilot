@@ -4,6 +4,9 @@
 #include <AP_GPS/AP_GPS.h>
 #include <AP_SerialManager/AP_SerialManager.h>
 #include <GCS_MAVLink/GCS.h>
+#include <AP_Math/AP_Math.h>
+
+#include <cmath>
 #include <cstring>
 
 extern const AP_HAL::HAL& hal;
@@ -26,17 +29,53 @@ static constexpr uint8_t UBX_NAV_PVT    = 0x07;
 static constexpr uint8_t UBX_ACK_NAK = 0x00;
 static constexpr uint8_t UBX_ACK_ACK = 0x01;
 
-static constexpr uint8_t UBX_CFG_PRT  = 0x00;
-static constexpr uint8_t UBX_CFG_MSG  = 0x01;
-static constexpr uint8_t UBX_CFG_RATE = 0x08;
-static constexpr uint8_t UBX_CFG_NAV5 = 0x24;
+static constexpr uint8_t UBX_CFG_PRT    = 0x00;
+static constexpr uint8_t UBX_CFG_MSG    = 0x01;
+static constexpr uint8_t UBX_CFG_RATE   = 0x08;
+static constexpr uint8_t UBX_CFG_NAV5   = 0x24;
 static constexpr uint8_t UBX_CFG_VALSET = 0x8A;
 static constexpr uint8_t UBX_CFG_VALGET = 0x8B;
 static constexpr uint8_t UBX_CFG_VALDEL = 0x8C;
 
+// ============================
+// 用户可调参数
+// ============================
+
+// 用哪个 RC 通道做 fake GPS 开关
+// 0 基索引：CH1->0, CH7->6, CH8->7 ...
+static constexpr uint8_t FAKE_GPS_RC_CHANNEL_INDEX = 6;   // CH7
+
+// 拨杆高电平阈值
+static constexpr uint16_t FAKE_GPS_PWM_HIGH = 1700;
+static constexpr uint16_t FAKE_GPS_PWM_LOW  = 1300;
+
+// 如果室内一上电主飞控就没有真 GPS，可用这个默认锚点
+// 下面默认值就是你当前场地附近，按需改
+static constexpr int32_t DEFAULT_FAKE_LAT_E7 = 305385000;   // 30.5385000
+static constexpr int32_t DEFAULT_FAKE_LON_E7 = 1040560000;  // 104.0560000
+static constexpr int32_t DEFAULT_FAKE_ALT_CM = 10000;       // 520m
+
+// 默认假 GPS 质量参数
+static constexpr uint8_t  DEFAULT_FAKE_NUM_SATS = 14;
+static constexpr uint32_t DEFAULT_FAKE_HACC_MM  = 800;   // 0.8m
+static constexpr uint32_t DEFAULT_FAKE_VACC_MM  = 1500;  // 1.5m
+static constexpr uint32_t DEFAULT_FAKE_SACC_MMPS = 120;  // 0.12m/s
+static constexpr uint32_t DEFAULT_FAKE_HEADACC_1E5 = 500000; // 5deg
+
+// 是否启用脚本运动模式
+// false: 锁点模式（最稳，适合室内先骗过测试飞控）
+// true : 按固定航向+固定速度直线运动
+static constexpr bool FAKE_SCRIPT_MOVE_ENABLE = false;
+
+// 脚本运动参数（只有上面为 true 才生效）
+static constexpr float FAKE_SCRIPT_SPEED_MPS   = 0.8f;
+static constexpr float FAKE_SCRIPT_HEADING_DEG = 90.0f;
+
+// ============================
+
 #pragma pack(push, 1)
 struct UBXNavPosllh {
-    uint32_t iTOW;-
+    uint32_t iTOW;
     int32_t lon;
     int32_t lat;
     int32_t height;
@@ -137,6 +176,48 @@ struct UBXAck {
 };
 #pragma pack(pop)
 
+// 统一导航解
+struct NavSolution {
+    int32_t lat = 0;          // degE7
+    int32_t lon = 0;          // degE7
+    int32_t alt_cm = 0;       // cm
+    float velN = 0.0f;        // m/s
+    float velE = 0.0f;        // m/s
+    float velD = 0.0f;        // m/s
+    float groundspeed = 0.0f; // m/s
+    float course_deg = 0.0f;  // deg
+    uint8_t fixType = 0;      // 0/2/3
+    uint8_t flags = 0;        // gnssFixOK...
+    uint8_t numSV = 0;
+    uint32_t hAcc_mm = 1500;
+    uint32_t vAcc_mm = 2500;
+    uint32_t sAcc_mmps = 200;
+    uint32_t iTOW = 0;
+};
+
+struct FakeState {
+    bool active = false;
+    bool initialized = false;
+
+    int32_t anchor_lat = DEFAULT_FAKE_LAT_E7;
+    int32_t anchor_lon = DEFAULT_FAKE_LON_E7;
+    int32_t anchor_alt_cm = DEFAULT_FAKE_ALT_CM;
+
+    float north_m = 0.0f;
+    float east_m  = 0.0f;
+    float down_m  = 0.0f;
+
+    float heading_deg = FAKE_SCRIPT_HEADING_DEG;
+    float speed_mps   = 0.0f;
+
+    uint32_t last_update_ms = 0;
+    uint32_t fake_itow_ms   = 0;
+};
+
+static NavSolution g_nav_sol{};
+static bool g_nav_sol_valid = false;
+static FakeState g_fake_state{};
+
 static uint8_t map_fix_type(const AP_GPS::GPS_Status st)
 {
     switch (st) {
@@ -165,9 +246,9 @@ static uint8_t map_fix_flags(const AP_GPS::GPS_Status st)
         flags |= 1U << 1; // diffSoln
     }
     if (st == AP_GPS::GPS_OK_FIX_3D_RTK_FLOAT) {
-        flags |= 1U << 6; // carrSoln = float (01)
+        flags |= 1U << 6; // carrSoln=float
     } else if (st == AP_GPS::GPS_OK_FIX_3D_RTK_FIXED) {
-        flags |= 1U << 7; // carrSoln = fixed (10)
+        flags |= 1U << 7; // carrSoln=fixed
     }
 
     return flags;
@@ -180,6 +261,195 @@ static uint32_t gps_itow_ms(const AP_GPS &gps, uint32_t fallback_ms)
         return tow;
     }
     return fallback_ms % 604800000UL;
+}
+
+static bool fake_mode_enabled()
+{
+    if (hal.rcin == nullptr) {
+        return false;
+    }
+
+    const uint16_t pwm = hal.rcin->read(FAKE_GPS_RC_CHANNEL_INDEX);
+    return pwm > FAKE_GPS_PWM_HIGH;
+}
+
+static void update_anchor_from_real_gps_if_available()
+{
+    AP_GPS &gps = AP::gps();
+    if (gps.status() < AP_GPS::GPS_OK_FIX_3D) {
+        return;
+    }
+
+    const Location &loc = gps.location();
+    if (loc.lat == 0 || loc.lng == 0) {
+        return;
+    }
+
+    g_fake_state.anchor_lat = loc.lat;
+    g_fake_state.anchor_lon = loc.lng;
+    g_fake_state.anchor_alt_cm = loc.alt;
+
+    float course_deg = gps.ground_course();
+    if (!isfinite(course_deg)) {
+        const Vector3f &vel = gps.velocity();
+        course_deg = wrap_360(degrees(atan2f(vel.y, vel.x)));
+    }
+    if (isfinite(course_deg)) {
+        g_fake_state.heading_deg = wrap_360(course_deg);
+    }
+}
+
+static void enter_fake_mode(uint32_t now_ms)
+{
+    g_fake_state.active = true;
+    g_fake_state.initialized = true;
+    g_fake_state.last_update_ms = now_ms;
+    g_fake_state.fake_itow_ms = now_ms % 604800000UL;
+
+    update_anchor_from_real_gps_if_available();
+
+    g_fake_state.north_m = 0.0f;
+    g_fake_state.east_m  = 0.0f;
+    g_fake_state.down_m  = 0.0f;
+    g_fake_state.speed_mps = 0.0f;
+
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO,
+                  "FAKE_UBX: enter fake mode lat=%.6f lon=%.6f alt=%.2f",
+                  g_fake_state.anchor_lat * 1.0e-7f,
+                  g_fake_state.anchor_lon * 1.0e-7f,
+                  g_fake_state.anchor_alt_cm * 0.01f);
+}
+
+static void leave_fake_mode()
+{
+    g_fake_state.active = false;
+    g_fake_state.initialized = false;
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "FAKE_UBX: leave fake mode");
+}
+
+static void update_fake_state(uint32_t now_ms)
+{
+    if (!g_fake_state.initialized) {
+        return;
+    }
+
+    const uint32_t dt_ms = now_ms - g_fake_state.last_update_ms;
+    g_fake_state.last_update_ms = now_ms;
+    g_fake_state.fake_itow_ms += dt_ms;
+
+    if (!FAKE_SCRIPT_MOVE_ENABLE) {
+        // 锁点模式：位置不变，速度为 0
+        g_fake_state.speed_mps = 0.0f;
+        return;
+    }
+
+    // 脚本运动模式
+    g_fake_state.heading_deg = wrap_360(FAKE_SCRIPT_HEADING_DEG);
+    g_fake_state.speed_mps = FAKE_SCRIPT_SPEED_MPS;
+
+    const float dt = dt_ms * 0.001f;
+    const float yaw_rad = radians(g_fake_state.heading_deg);
+
+    g_fake_state.north_m += cosf(yaw_rad) * g_fake_state.speed_mps * dt;
+    g_fake_state.east_m  += sinf(yaw_rad) * g_fake_state.speed_mps * dt;
+}
+
+static bool build_real_solution(uint32_t now_ms, NavSolution &sol)
+{
+    AP_GPS &gps = AP::gps();
+
+    if (gps.status() < AP_GPS::GPS_OK_FIX_3D) {
+        return false;
+    }
+
+    const Location &loc = gps.location();
+    if (loc.lat == 0 || loc.lng == 0) {
+        return false;
+    }
+
+    const Vector3f &vel = gps.velocity();
+
+    float hacc_m = 1.5f;
+    float vacc_m = 2.5f;
+    if (!gps.horizontal_accuracy(hacc_m)) {
+        hacc_m = 1.5f;
+    }
+    if (!gps.vertical_accuracy(vacc_m)) {
+        vacc_m = 2.5f;
+    }
+
+    float course_deg = gps.ground_course();
+    if (!isfinite(course_deg)) {
+        course_deg = wrap_360(degrees(atan2f(vel.y, vel.x)));
+    }
+    if (!isfinite(course_deg)) {
+        course_deg = 0.0f;
+    }
+
+    uint8_t sats = gps.num_sats();
+    if (sats < 10) {
+        sats = 10;
+    }
+
+    sol.lat = loc.lat;
+    sol.lon = loc.lng;
+    sol.alt_cm = loc.alt;
+    sol.velN = vel.x;
+    sol.velE = vel.y;
+    sol.velD = vel.z;
+    sol.groundspeed = gps.ground_speed();
+    sol.course_deg = wrap_360(course_deg);
+    sol.fixType = map_fix_type(gps.status());
+    sol.flags = map_fix_flags(gps.status());
+    sol.numSV = sats;
+    sol.hAcc_mm = uint32_t(fmaxf(0.2f, hacc_m) * 1000.0f);
+    sol.vAcc_mm = uint32_t(fmaxf(0.3f, vacc_m) * 1000.0f);
+    sol.sAcc_mmps = 200;
+    sol.iTOW = gps_itow_ms(gps, now_ms);
+
+    // 持续更新 fake 模式的锚点
+    g_fake_state.anchor_lat = loc.lat;
+    g_fake_state.anchor_lon = loc.lng;
+    g_fake_state.anchor_alt_cm = loc.alt;
+
+    return true;
+}
+
+static bool build_fake_solution(uint32_t now_ms, NavSolution &sol)
+{
+    if (!g_fake_state.initialized) {
+        enter_fake_mode(now_ms);
+    }
+
+    update_fake_state(now_ms);
+
+    const double lat0_deg = g_fake_state.anchor_lat * 1.0e-7;
+    const double lon0_deg = g_fake_state.anchor_lon * 1.0e-7;
+    const double lat_rad = radians(lat0_deg);
+
+    const double dlat_deg = (g_fake_state.north_m / 6378137.0) * 180.0 / M_PI;
+    const double dlon_deg = (g_fake_state.east_m / (6378137.0 * fmax(0.01, cos(lat_rad)))) * 180.0 / M_PI;
+
+    sol.lat = int32_t(lrint((lat0_deg + dlat_deg) * 1.0e7));
+    sol.lon = int32_t(lrint((lon0_deg + dlon_deg) * 1.0e7));
+    sol.alt_cm = g_fake_state.anchor_alt_cm - int32_t(lrint(g_fake_state.down_m * 100.0f));
+
+    const float yaw_rad = radians(g_fake_state.heading_deg);
+    sol.velN = cosf(yaw_rad) * g_fake_state.speed_mps;
+    sol.velE = sinf(yaw_rad) * g_fake_state.speed_mps;
+    sol.velD = 0.0f;
+    sol.groundspeed = g_fake_state.speed_mps;
+    sol.course_deg = wrap_360(g_fake_state.heading_deg);
+
+    sol.fixType = 3;
+    sol.flags = 0x01; // gnssFixOK
+    sol.numSV = DEFAULT_FAKE_NUM_SATS;
+    sol.hAcc_mm = DEFAULT_FAKE_HACC_MM;
+    sol.vAcc_mm = DEFAULT_FAKE_VACC_MM;
+    sol.sAcc_mmps = DEFAULT_FAKE_SACC_MMPS;
+    sol.iTOW = g_fake_state.fake_itow_ms;
+
+    return true;
 }
 
 } // namespace
@@ -207,6 +477,7 @@ void GPS_SEND::update(void)
     const uint32_t now_ms = AP_HAL::millis();
     static uint32_t last_no_uart_ms = 0;
     static uint32_t last_no_gps_ms = 0;
+    static bool last_fake_enable = false;
 
     if (uart == nullptr) {
         if (now_ms - last_no_uart_ms > 1000) {
@@ -223,17 +494,32 @@ void GPS_SEND::update(void)
     }
     last_send_ms = now_ms;
 
-    AP_GPS &gps = AP::gps();
-    if (gps.status() < AP_GPS::GPS_OK_FIX_3D) {
-        if (now_ms - last_no_gps_ms > 1000) {
-            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "FAKE_UBX: source GPS no 3D fix");
-            last_no_gps_ms = now_ms;
+    const bool fake_enable = fake_mode_enabled();
+
+    if (fake_enable && !last_fake_enable) {
+        enter_fake_mode(now_ms);
+    } else if (!fake_enable && last_fake_enable) {
+        leave_fake_mode();
+    }
+    last_fake_enable = fake_enable;
+
+    g_nav_sol_valid = false;
+
+    if (fake_enable) {
+        g_nav_sol_valid = build_fake_solution(now_ms, g_nav_sol);
+    } else {
+        g_nav_sol_valid = build_real_solution(now_ms, g_nav_sol);
+
+        if (!g_nav_sol_valid) {
+            if (now_ms - last_no_gps_ms > 1000) {
+                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "FAKE_UBX: source GPS no 3D fix");
+                last_no_gps_ms = now_ms;
+            }
+            return;
         }
-        return;
     }
 
-    const Location &loc = gps.location();
-    if (loc.lat == 0 || loc.lng == 0) {
+    if (!g_nav_sol_valid) {
         return;
     }
 
@@ -333,6 +619,7 @@ void GPS_SEND::handle_packet(uint8_t msg_class, uint8_t msg_id, const uint8_t *p
             send_ack(msg_class, msg_id, true);
         }
         break;
+
     case UBX_CFG_RATE:
         if (len == 0) {
             send_cfg_rate();
@@ -340,6 +627,7 @@ void GPS_SEND::handle_packet(uint8_t msg_class, uint8_t msg_id, const uint8_t *p
             send_ack(msg_class, msg_id, true);
         }
         break;
+
     case UBX_CFG_MSG:
     case UBX_CFG_NAV5:
     case UBX_CFG_VALSET:
@@ -347,6 +635,7 @@ void GPS_SEND::handle_packet(uint8_t msg_class, uint8_t msg_id, const uint8_t *p
     case UBX_CFG_VALDEL:
         send_ack(msg_class, msg_id, true);
         break;
+
     default:
         (void)payload;
         send_ack(msg_class, msg_id, true);
@@ -421,54 +710,33 @@ void GPS_SEND::send_cfg_rate(void)
 
 void GPS_SEND::send_nav_packets(uint32_t now_ms)
 {
-    AP_GPS &gps = AP::gps();
-    const Location &loc = gps.location();
-    const Vector3f &vel = gps.velocity();
-
-    float hacc_m = 1.5f;
-    float vacc_m = 2.5f;
-    if (!gps.horizontal_accuracy(hacc_m)) {
-        hacc_m = 1.5f;
-    }
-    if (!gps.vertical_accuracy(vacc_m)) {
-        vacc_m = 2.5f;
+    if (!g_nav_sol_valid) {
+        return;
     }
 
-    const float groundspeed = gps.ground_speed();
-    float course_deg = gps.ground_course();
-    if (!isfinite(course_deg)) {
-        course_deg = wrap_360(degrees(atan2f(vel.y, vel.x)));
-    }
-
-    const uint32_t iTOW = gps_itow_ms(gps, now_ms);
-    const uint8_t fixType = map_fix_type(gps.status());
-    const uint8_t flags = map_fix_flags(gps.status());
-    const uint8_t sats = MAX(uint8_t(10), gps.num_sats());
-    const uint32_t hAcc_mm = uint32_t(MAX(0.2f, hacc_m) * 1000.0f);
-    const uint32_t vAcc_mm = uint32_t(MAX(0.3f, vacc_m) * 1000.0f);
-    const uint32_t sAcc_mmps = 200;
-    const uint32_t headAcc_1e5 = 500000; // 5 deg
+    const NavSolution &sol = g_nav_sol;
+    const uint32_t headAcc_1e5 = DEFAULT_FAKE_HEADACC_1E5;
 
     UBXNavPosllh pos{};
-    pos.iTOW = iTOW;
-    pos.lon = loc.lng;
-    pos.lat = loc.lat;
-    pos.height = loc.alt * 10; // cm -> mm
-    pos.hMSL = loc.alt * 10;
-    pos.hAcc = hAcc_mm;
-    pos.vAcc = vAcc_mm;
+    pos.iTOW   = sol.iTOW;
+    pos.lon    = sol.lon;
+    pos.lat    = sol.lat;
+    pos.height = sol.alt_cm * 10; // cm -> mm
+    pos.hMSL   = sol.alt_cm * 10;
+    pos.hAcc   = sol.hAcc_mm;
+    pos.vAcc   = sol.vAcc_mm;
 
     UBXNavStatus status{};
-    status.iTOW = iTOW;
-    status.gpsFix = fixType;
-    status.flags = flags;
+    status.iTOW   = sol.iTOW;
+    status.gpsFix = sol.fixType;
+    status.flags  = sol.flags;
     status.fixStat = 0;
-    status.flags2 = 0;
-    status.ttff = 1000;
-    status.msss = now_ms;
+    status.flags2  = 0;
+    status.ttff    = 1000;
+    status.msss    = now_ms;
 
     UBXNavDop dop{};
-    dop.iTOW = iTOW;
+    dop.iTOW = sol.iTOW;
     dop.gDOP = 150;
     dop.pDOP = 120;
     dop.tDOP = 100;
@@ -478,66 +746,67 @@ void GPS_SEND::send_nav_packets(uint32_t now_ms)
     dop.eDOP = 100;
 
     UBXNavVelned velned{};
-    velned.iTOW = iTOW;
-    velned.velN = int32_t(lrintf(vel.x * 100.0f));
-    velned.velE = int32_t(lrintf(vel.y * 100.0f));
-    velned.velD = int32_t(lrintf(vel.z * 100.0f));
-    velned.speed = uint32_t(lrintf(sqrtf(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z) * 100.0f));
-    velned.gSpeed = uint32_t(lrintf(groundspeed * 100.0f));
-    velned.heading = int32_t(lrintf(course_deg * 100000.0f));
-    velned.sAcc = sAcc_mmps;
+    velned.iTOW = sol.iTOW;
+    velned.velN = int32_t(lrintf(sol.velN * 100.0f));
+    velned.velE = int32_t(lrintf(sol.velE * 100.0f));
+    velned.velD = int32_t(lrintf(sol.velD * 100.0f));
+    velned.speed  = uint32_t(lrintf(sqrtf(sol.velN * sol.velN + sol.velE * sol.velE + sol.velD * sol.velD) * 100.0f));
+    velned.gSpeed = uint32_t(lrintf(sol.groundspeed * 100.0f));
+    velned.heading = int32_t(lrintf(wrap_360(sol.course_deg) * 100000.0f));
+    velned.sAcc = sol.sAcc_mmps;
     velned.cAcc = headAcc_1e5;
 
     UBXNavPvt pvt{};
-    pvt.iTOW = iTOW;
-    pvt.year = 2026;
+    pvt.iTOW  = sol.iTOW;
+    pvt.year  = 2026;
     pvt.month = 1;
-    pvt.day = 1;
-    pvt.hour = 0;
-    pvt.min = 0;
-    pvt.sec = 0;
-    pvt.valid = 0;
-    pvt.tAcc = 0;
-    pvt.nano = 0;
-    pvt.fixType = fixType;
-    pvt.flags = flags;
-    pvt.flags2 = 0;
-    pvt.numSV = sats;
-    pvt.lon = loc.lng;
-    pvt.lat = loc.lat;
-    pvt.height = loc.alt * 10;
-    pvt.hMSL = loc.alt * 10;
-    pvt.hAcc = hAcc_mm;
-    pvt.vAcc = vAcc_mm;
-    pvt.velN = velned.velN;
-    pvt.velE = velned.velE;
-    pvt.velD = velned.velD;
-    pvt.gSpeed = int32_t(velned.gSpeed);
+    pvt.day   = 1;
+    pvt.hour  = 0;
+    pvt.min   = 0;
+    pvt.sec   = 0;
+    pvt.valid = 0x07;   // date/time fully valid
+    pvt.tAcc  = 0;
+    pvt.nano  = 0;
+    pvt.fixType = sol.fixType;
+    pvt.flags   = sol.flags;
+    pvt.flags2  = 0;
+    pvt.numSV   = sol.numSV;
+    pvt.lon     = sol.lon;
+    pvt.lat     = sol.lat;
+    pvt.height  = sol.alt_cm * 10;
+    pvt.hMSL    = sol.alt_cm * 10;
+    pvt.hAcc    = sol.hAcc_mm;
+    pvt.vAcc    = sol.vAcc_mm;
+    pvt.velN    = velned.velN;
+    pvt.velE    = velned.velE;
+    pvt.velD    = velned.velD;
+    pvt.gSpeed  = int32_t(velned.gSpeed);
     pvt.headMot = velned.heading;
-    pvt.sAcc = sAcc_mmps;
+    pvt.sAcc    = sol.sAcc_mmps;
     pvt.headAcc = headAcc_1e5;
-    pvt.pDOP = 120;
+    pvt.pDOP    = 120;
     memset(pvt.reserved1, 0, sizeof(pvt.reserved1));
     pvt.headVeh = velned.heading;
-    pvt.magDec = 0;
-    pvt.magAcc = 0;
+    pvt.magDec  = 0;
+    pvt.magAcc  = 0;
 
-    (void)send_ubx(UBX_CLASS_NAV, UBX_NAV_PVT, &pvt, sizeof(pvt));
-    (void)send_ubx(UBX_CLASS_NAV, UBX_NAV_POSLLH, &pos, sizeof(pos));
+    (void)send_ubx(UBX_CLASS_NAV, UBX_NAV_PVT,    &pvt,    sizeof(pvt));
+    (void)send_ubx(UBX_CLASS_NAV, UBX_NAV_POSLLH, &pos,    sizeof(pos));
     (void)send_ubx(UBX_CLASS_NAV, UBX_NAV_STATUS, &status, sizeof(status));
     (void)send_ubx(UBX_CLASS_NAV, UBX_NAV_VELNED, &velned, sizeof(velned));
-    (void)send_ubx(UBX_CLASS_NAV, UBX_NAV_DOP, &dop, sizeof(dop));
+    (void)send_ubx(UBX_CLASS_NAV, UBX_NAV_DOP,    &dop,    sizeof(dop));
 
     static uint32_t last_print_ms = 0;
     if (now_ms - last_print_ms > 1000) {
         GCS_SEND_TEXT(MAV_SEVERITY_INFO,
-                      "FAKE_UBX TX lat=%.6f lon=%.6f alt=%.2f gs=%.2f crs=%.1f sats=%u",
-                      loc.lat * 1e-7f,
-                      loc.lng * 1e-7f,
-                      loc.alt * 0.01f,
-                      groundspeed,
-                      course_deg,
-                      (unsigned)sats);
+                      "FAKE_UBX TX mode=%s lat=%.6f lon=%.6f alt=%.2f gs=%.2f crs=%.1f sats=%u",
+                      g_fake_state.active ? "FAKE" : "REAL",
+                      sol.lat * 1e-7f,
+                      sol.lon * 1e-7f,
+                      sol.alt_cm * 0.01f,
+                      sol.groundspeed,
+                      sol.course_deg,
+                      (unsigned)sol.numSV);
         last_print_ms = now_ms;
     }
 }
