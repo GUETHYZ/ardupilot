@@ -15,7 +15,7 @@ void GPS_RECEIVE::init()
 {
     auto &sm = AP::serialmanager();
 
-    uart = sm.find_serial(AP_SerialManager::SerialProtocol_MY_LINS313, 0);
+    uart = sm.find_serial(AP_SerialManager::SerialProtocol_MESSAGE_RT, 0);
 
     if (uart == nullptr)
     {

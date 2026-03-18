@@ -43,7 +43,7 @@ MY_LINS313::MY_LINS313(MY_LINS313 &_frontend, AP_HAL::UARTDriver *uart_ptr)
 void MY_LINS313::init()
 {
     auto &my_313_p = AP::serialmanager();
-    uart = my_313_p.find_serial(AP_SerialManager::SerialProtocol_MY_LINS313,0);
+    uart = my_313_p.find_serial(AP_SerialManager::SerialProtocol_FAKE_GPS,0);
     if (uart == nullptr) 
     {
         gcs().send_text(MAV_SEVERITY_INFO,"LINS313 Uart Init Error");
