@@ -123,6 +123,7 @@ void Copter::init_ardupilot()
     //my_LINS313.init();
     gps_receive.init();
     gps_send.init();
+    message_rt_send.init();
 #endif
 
 #if AC_PRECLAND_ENABLED

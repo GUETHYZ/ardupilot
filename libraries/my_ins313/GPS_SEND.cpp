@@ -38,10 +38,10 @@ static constexpr uint8_t UBX_CFG_VALGET = 0x8B;
 static constexpr uint8_t UBX_CFG_VALDEL = 0x8C;
 
 // ============================
-// 用户可调参数
+// 可调参数如下
 // ============================
 
-// 用哪个 RC 通道做 fake GPS 开关
+// 用 RC 通道做 fake GPS 开关
 // 0 基索引：CH1->0, CH7->6, CH8->7 ...
 static constexpr uint8_t FAKE_GPS_RC_CHANNEL_INDEX = 6;   // CH7
 
@@ -50,7 +50,7 @@ static constexpr uint16_t FAKE_GPS_PWM_HIGH = 1700;
 static constexpr uint16_t FAKE_GPS_PWM_LOW  = 1300;
 
 // 如果室内一上电主飞控就没有真 GPS，可用这个默认锚点
-// 下面默认值就是你当前场地附近，按需改
+// 下面默认值是当前场地附近，按需改
 static constexpr int32_t DEFAULT_FAKE_LAT_E7 = 305385000;   // 30.5385000
 static constexpr int32_t DEFAULT_FAKE_LON_E7 = 1040560000;  // 104.0560000
 static constexpr int32_t DEFAULT_FAKE_ALT_CM = 10000;       // 520m

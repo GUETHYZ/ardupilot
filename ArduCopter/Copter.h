@@ -76,6 +76,7 @@
 #include <my_ins313/LINS313.h>
 #include <my_ins313/GPS_SEND.h>
 #include <my_ins313/GPS_RECEIVE.h>
+#include <my_ins313/MESSAGE_RT_SEND.h>
 
 // Configuration
 #include "defines.h"
@@ -255,6 +256,7 @@ private:
     MY_LINS313 my_LINS313;
     GPS_SEND gps_send;
     GPS_RECEIVE gps_receive;
+    MESSAGE_RT_SEND message_rt_send;
 
     // flight modes convenience array
     AP_Int8 *flight_modes;
