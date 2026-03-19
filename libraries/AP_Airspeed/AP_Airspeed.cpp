@@ -871,14 +871,32 @@ bool AP_Airspeed::enabled(uint8_t i) const {
 }
 
 // return health status of sensor
-bool AP_Airspeed::healthy(uint8_t i) const {
-    bool ok = state[i].healthy && enabled(i) && sensor[i] != nullptr;
-#ifndef HAL_BUILD_AP_PERIPH
-    // sanity check the offset parameter.  Zero is permitted if we are skipping calibration.
-    ok &= (fabsf(param[i].offset) > 0 || state[i].use_zero_offset || param[i].skip_cal);
+// bool AP_Airspeed::healthy(uint8_t i) const {
+//     bool ok = state[i].healthy && enabled(i) && sensor[i] != nullptr;
+// #ifndef HAL_BUILD_AP_PERIPH
+//     // sanity check the offset parameter.  Zero is permitted if we are skipping calibration.
+//     ok &= (fabsf(param[i].offset) > 0 || state[i].use_zero_offset || param[i].skip_cal);
+// #endif
+//     return ok;
+// }
+bool AP_Airspeed::healthy(uint8_t i) const
+{
+    if (!enabled(i)) {
+        return false;
+    }
+
+#if AP_AIRSPEED_EXTERNAL_ENABLED
+    if (param[i].type == TYPE_EXTERNAL) {
+        const uint32_t now_ms = AP_HAL::millis();
+        return state[i].last_update_ms != 0 &&
+               (now_ms - state[i].last_update_ms) < 300;
+    }
 #endif
-    return ok;
+
+    return state[i].healthy;
 }
+
+
 
 // return the current airspeed in m/s
 float AP_Airspeed::get_airspeed(uint8_t i) const {

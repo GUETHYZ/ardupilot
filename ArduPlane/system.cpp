@@ -115,6 +115,7 @@ void Plane::init_ardupilot()
 #endif
 
 #if GPS_RECEIVE_ENABLED
+    message_rt_receive.init();
     gps_receive.init();
     gps_send.init();
 #endif

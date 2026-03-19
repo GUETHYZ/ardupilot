@@ -14,7 +14,16 @@
 void AP_Airspeed::check_sensor_failures()
 {
 #ifndef HAL_BUILD_AP_PERIPH
-    for (uint8_t i=0; i<AIRSPEED_MAX_SENSORS; i++) {
+    for (uint8_t i = 0; i < AIRSPEED_MAX_SENSORS; i++) {
+
+#if AP_AIRSPEED_EXTERNAL_ENABLED
+        // 外部空速(TYPE_EXTERNAL)不参与真实皮托类的 failure checks，
+        // 否则在台架静止、但人工注入空速时会被 groundspeed mismatch 误判为 unhealthy
+        if (param[i].type == TYPE_EXTERNAL) {
+            continue;
+        }
+#endif
+
         check_sensor_ahrs_wind_max_failures(i);
     }
 #endif

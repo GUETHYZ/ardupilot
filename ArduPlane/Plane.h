@@ -128,6 +128,7 @@
 #include <my_ins313/LINS313_SEND.h>
 #include <my_ins313/GPS_RECEIVE.h>
 #include <my_ins313/GPS_SEND.h>
+#include <my_ins313/MESSAGE_RT_RECEIVE.h>
 
 /*
   main APM:Plane class
@@ -213,6 +214,7 @@ private:
     MY_LINS313_SEND my_LINS313_send;
     GPS_RECEIVE gps_receive;
     GPS_SEND gps_send;
+    MESSAGE_RT_RECEIVE message_rt_receive ;
 
     // scaled roll limit based on pitch
     int32_t roll_limit_cd;

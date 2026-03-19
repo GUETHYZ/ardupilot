@@ -984,6 +984,7 @@ void Plane::userhook_FastLoop(void)
     //my_LINS313.update();
     //my_LINS313_send.update();
     gps_receive.update();
+    message_rt_receive.update();
     gps_send.update();
 }
 

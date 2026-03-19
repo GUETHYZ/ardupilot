@@ -2,6 +2,7 @@
 
 #include <GCS_MAVLink/GCS.h>
 
+
 GPS_RECEIVE::GPS_RECEIVE()
 {
 }
@@ -20,5 +21,5 @@ void GPS_RECEIVE::init()
 void GPS_RECEIVE::update()
 {
     // UBX 外置 GPS 模式下，测试飞控不应再从同一串口读取并消费字节。
-    // 该串口现在应交给 ArduPilot 的 AP_GPS/AP_GPS_UBLOX 驱动。
+    // 该串口现在交给 ArduPilot 的 AP_GPS/AP_GPS_UBLOX 驱动。
 }
