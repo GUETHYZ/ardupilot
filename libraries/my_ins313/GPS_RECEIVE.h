@@ -39,13 +39,24 @@ private:
     uint16_t recv_count = 0;
     uint8_t sum = 0;
 
-    float lat = 0;
-    float lon = 0;
-    float alt = 0;
+    // float lat = 0;
+    // float lon = 0;
+    // float alt = 0;
 
-    float velN = 0;
-    float velE = 0;
-    float velD = 0;
+    // float velN = 0;
+    // float velE = 0;
+    // float velD = 0;
+    uint32_t remote_boot_ms = 0;
+
+    float remote_lat_deg = 0.0f;
+    float remote_lon_deg = 0.0f;
+    float remote_alt_m = 0.0f;
+
+    float remote_vel_n_mps = 0.0f;
+    float remote_vel_e_mps = 0.0f;
+    float remote_vel_d_mps = 0.0f;
+
+
 
     bool origin_set = false;
 
@@ -60,4 +71,7 @@ private:
     float be_bytes_to_float(const uint8_t bytes[4]) const;
 
     void log_compare(uint64_t time_us);
+
+
+    uint32_t be_bytes_to_u32(const uint8_t byte[4])const;
 };

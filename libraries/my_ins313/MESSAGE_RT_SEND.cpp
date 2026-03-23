@@ -113,7 +113,7 @@ void MESSAGE_RT_SEND::update()
     const bool ok = send_packet(now_ms, groundspeed, yaw_deg, velN, velE, flags);
 
     static uint32_t last_print_ms = 0;
-    if (now_ms - last_print_ms >= 1000) {
+    if (now_ms - last_print_ms >= 8000) {
         gcs().send_text(
             ok ? MAV_SEVERITY_INFO : MAV_SEVERITY_WARNING,
             "MSGRT_SEND gs=%.2f yaw=%.1f vN=%.2f vE=%.2f flg=0x%02X gps_dis=%u",

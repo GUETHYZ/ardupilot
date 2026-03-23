@@ -313,11 +313,11 @@ static void enter_fake_mode(uint32_t now_ms)
     g_fake_state.down_m  = 0.0f;
     g_fake_state.speed_mps = 0.0f;
 
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO,
-                  "FAKE_UBX: enter fake mode lat=%.6f lon=%.6f alt=%.2f",
-                  g_fake_state.anchor_lat * 1.0e-7f,
-                  g_fake_state.anchor_lon * 1.0e-7f,
-                  g_fake_state.anchor_alt_cm * 0.01f);
+    // GCS_SEND_TEXT(MAV_SEVERITY_INFO,
+    //               "FAKE_UBX: enter fake mode lat=%.6f lon=%.6f alt=%.2f",
+    //               g_fake_state.anchor_lat * 1.0e-7f,
+    //               g_fake_state.anchor_lon * 1.0e-7f,
+    //               g_fake_state.anchor_alt_cm * 0.01f);
 }
 
 static void leave_fake_mode()
@@ -512,7 +512,7 @@ void GPS_SEND::update(void)
 
         if (!g_nav_sol_valid) {
             if (now_ms - last_no_gps_ms > 1000) {
-                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "FAKE_UBX: source GPS no 3D fix");
+                //GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "FAKE_UBX: source GPS no 3D fix");
                 last_no_gps_ms = now_ms;
             }
             return;

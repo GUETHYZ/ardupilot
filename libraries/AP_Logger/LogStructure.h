@@ -682,21 +682,21 @@ struct PACKED log_GPEK
     LOG_PACKET_HEADER;
     uint64_t time_us;
 
-    float test_n;
-    float test_e;
-    float test_d;
+    float remote_n;
+    float remote_e;
+    float remote_d;
 
     float main_n;
     float main_e;
     float main_d;
 
-    float dpos_n;
-    float dpos_e;
-    float dpos_d;
+    float pos_err_n;
+    float pos_err_e;
+    float pos_err_d;
 
-    float dvel_n;
-    float dvel_e;
-    float dvel_d;
+    float vel_err_n;
+    float vel_err_e;
+    float vel_err_d;
 };
 
 // FMT messages define all message formats other than FMT
@@ -1220,7 +1220,8 @@ struct PACKED log_GPEK
       "LINS",  "Qfff",      "TimeUS,Roll,Pitch,Yaw", "sddd", "FBBB" },\
     { LOG_LDC_MSG, sizeof(log_LDC), \
       "LDC",  "Qfffffffffff",      "TimeUS,LRoll,LPitch,LYaw,DRoll,DPitch,DYaw,ARoll,APitch,AYaw,Errorrp,Erroryaw", "sddddddddddd", "FBBBBBBBBBBB" },\
-    { LOG_GPEK_MSG, sizeof(log_GPEK), "GPEK", "Qffffffffffff", "TimeUS,TN,TE,TD,MN,ME,MD,DN,DE,DD,DVN,DVE,DVD", "s------------", "F------------" }, \
+    { LOG_GPEK_MSG, sizeof(log_GPEK), \
+      "GPEK", "Qffffffffffff",   "TimeUS,RN,RE,RD,MN,ME,MD,EPN,EPE,EPD,EVN,EVE,EVD",  "s------------", "F------------" },\
     LOG_STRUCTURE_FROM_GPS \
     { LOG_MESSAGE_MSG, sizeof(log_Message), \
       "MSG",  "QZ",     "TimeUS,Message", "s-", "F-"}, \
