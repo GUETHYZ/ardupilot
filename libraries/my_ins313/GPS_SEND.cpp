@@ -4,13 +4,19 @@
 #include <GCS_MAVLink/GCS.h>
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_SerialManager/AP_SerialManager.h>
+#include <AP_Logger/AP_Logger.h>
 
 
 
 extern const AP_HAL::HAL& hal;
 
-GPS_SEND::GPS_SEND() :
-    uart(nullptr)
+AP_AHRS &ahrs = AP::ahrs();
+
+Location loc;
+
+GPS_SEND::GPS_SEND(MESSAGE_RT_RECEIVE* msg_rt) :  // 新构造函数
+    uart(nullptr),
+    msg_rt_receive(msg_rt)
 {
 }
 
@@ -48,9 +54,7 @@ void GPS_SEND::update()
     static uint32_t last_partial_print_ms = 0;
     static bool last_location_valid = false;
 
-    AP_AHRS &ahrs = AP::ahrs();
 
-    Location loc;
     if (!ahrs.get_location(loc))
     {
         if (now_ms - last_no_location_print_ms > 1000)
@@ -126,6 +130,8 @@ void GPS_SEND::update()
 
     const size_t written = uart->write(buf, sizeof(buf));
 
+    log_comparison(AP_HAL::micros64());
+    
     if (written != sizeof(buf))
     {
         if (now_ms - last_partial_print_ms > 1000)
@@ -155,4 +161,27 @@ void GPS_SEND::float_to_be_bytes(float value, uint8_t bytes[4]) const
     bytes[1] = (u.i >> 16) & 0xFF;
     bytes[2] = (u.i >> 8) & 0xFF;
     bytes[3] = u.i & 0xFF;
+}
+
+
+
+void GPS_SEND::log_comparison(uint64_t time_us)
+{
+    #if HAL_LOGGING_ENABLED
+    
+    struct log_GPEK_TEST pkt = 
+    {
+        LOG_PACKET_HEADER_INIT(LOG_GPEK_TEST), // 初始化包头
+        remote_lat : loc.lat * 1e-7f, // 转换为度
+        remote_lon : loc.lng * 1e-7f, // 转换为度
+
+        main_lat :  msg_rt_receive->get_main_loc_lat(),  // 从 MESSAGE_RT_RECEIVE 获取主飞控位置,
+        main_lon :  msg_rt_receive->get_main_loc_lon(), // 从 MESSAGE_RT_RECEIVE 获取主飞控位置,
+
+    };
+    AP::logger().WriteBlock(&pkt, sizeof(pkt));
+    
+#endif
+
+
 }

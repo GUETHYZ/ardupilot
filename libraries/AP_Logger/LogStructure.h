@@ -702,6 +702,23 @@ struct PACKED log_LDC
     float error_yaw;
 };
 
+struct PACKED log_GPEK_TEST
+{
+  LOG_PACKET_HEADER;
+  uint64_t time_us;
+  float remote_lat;
+  float remote_lon;
+
+  float main_lat;
+  float main_lon;
+
+};
+
+
+
+
+
+
 
 // FMT messages define all message formats other than FMT
 // UNIT messages define units which can be referenced by FMTU messages
@@ -1254,7 +1271,9 @@ struct PACKED log_LDC
       "LINS",  "Qfff",      "TimeUS,Roll,Pitch,Yaw", "sddd", "FBBB" },\
     { LOG_LDC_MSG, sizeof(log_LDC), \
       "LDC",  "Qfffffffffff",      "TimeUS,LRoll,LPitch,LYaw,DRoll,DPitch,DYaw,ARoll,APitch,AYaw,Errorrp,Erroryaw", "sddddddddddd", "FBBBBBBBBBBB" },\
-LOG_STRUCTURE_FROM_GPS \
+    { LOG_GPEK_TEST, sizeof(log_GPEK_TEST), \
+      "GPEK",  "Qfffffff",      "TimeUS,RemoteLat,RemoteLon,MainLat,MainLon", "sdddddd", "FBBBBBB" },\
+      LOG_STRUCTURE_FROM_GPS \
     { LOG_MESSAGE_MSG, sizeof(log_Message), \
       "MSG",  "QZ",     "TimeUS,Message", "s-", "F-"}, \
     { LOG_RCIN_MSG, sizeof(log_RCIN), \
@@ -1459,6 +1478,7 @@ enum LogMessages : uint8_t {
 
     LOG_LINS313_MSG,
     LOG_LDC_MSG,
+    LOG_GPEK_TEST,
 
     _LOG_LAST_MSG_
 };

@@ -7,6 +7,8 @@
 #include <AP_SerialManager/AP_SerialManager.h>
 #include <GCS_MAVLink/GCS.h>
 #include <RC_Channel/RC_Channel.h>
+#include <AP_AHRS/AP_AHRS.h>
+#include <AP_VisualOdom/AP_VisualOdom.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -69,6 +71,9 @@ void MESSAGE_RT_RECEIVE::update()
     // 缓存值持续注入 airspeed
     inject_virtual_airspeed();
 
+    //把主飞控传入的yaw注入成ExternalNav yaw
+    inject_external_yaw();
+
     // 处理主飞控发来的控制请求（当前只做 GPS Disable）
     apply_control_requests();
 }
@@ -117,8 +122,8 @@ void MESSAGE_RT_RECEIVE::handle_packet()
     peer_boot_ms     = be_bytes_to_u32(&payload[0]);
     groundspeed_mps  = be_bytes_to_float(&payload[4]);
     yaw_deg          = be_bytes_to_float(&payload[8]);
-    velN_mps         = be_bytes_to_float(&payload[12]);
-    velE_mps         = be_bytes_to_float(&payload[16]);
+    main_loc_lat     = be_bytes_to_float(&payload[12]);
+    main_loc_lon     = be_bytes_to_float(&payload[16]);
     flags            = payload[20];
     last_rx_ms       = AP_HAL::millis();
     gps_disable_req  = (flags & FLAG_GPS_DISABLE_REQ) != 0;
@@ -127,11 +132,11 @@ void MESSAGE_RT_RECEIVE::handle_packet()
     if (last_rx_ms - last_print_ms >= 1000) {
         gcs().send_text(
             MAV_SEVERITY_INFO,
-            "MSGRT_RECV gs=%.2f yaw=%.1f vN=%.2f vE=%.2f flg=0x%02X h=%u gps_dis=%u",
+            "MSGRT_RECV gs=%.2f yaw=%.1f lat=%.2f lon=%.2f flg=0x%02X h=%u gps_dis=%u",
             groundspeed_mps,
             yaw_deg,
-            velN_mps,
-            velE_mps,
+            main_loc_lat,
+            main_loc_lon,
             (unsigned)flags,
             healthy() ? 1U : 0U,
             gps_disable_req ? 1U : 0U);
@@ -177,19 +182,19 @@ void MESSAGE_RT_RECEIVE::inject_virtual_airspeed()
 
     airspeed->handle_external(pkt);
 
-    static uint32_t last_dbg_ms = 0;
-    if (now_ms - last_dbg_ms >= 1000) {
-        gcs().send_text(
-            MAV_SEVERITY_INFO,
-            "AIRSPD_INJ gs=%.2f ratio=%.2f dp=%.2f | ASPD healthy=%u air=%.2f rawdp=%.2f",
-            gs_for_dp,
-            ratio,
-            pkt.differential_pressure,
-            airspeed->healthy() ? 1U : 0U,
-            airspeed->get_airspeed(),
-            airspeed->get_differential_pressure());
-        last_dbg_ms = now_ms;
-    }
+    // static uint32_t last_dbg_ms = 0;
+    // if (now_ms - last_dbg_ms >= 3000) {
+    //     gcs().send_text(
+    //         MAV_SEVERITY_INFO,
+    //         "AIRSPD_INJ gs=%.2f ratio=%.2f dp=%.2f | ASPD healthy=%u air=%.2f rawdp=%.2f",
+    //         gs_for_dp,
+    //         ratio,
+    //         pkt.differential_pressure,
+    //         airspeed->healthy() ? 1U : 0U,
+    //         airspeed->get_airspeed(),
+    //         airspeed->get_differential_pressure());
+    //     last_dbg_ms = now_ms;
+    // }
 #else
     static uint32_t last_warn_ms = 0;
     const uint32_t now_ms = AP_HAL::millis();
@@ -258,3 +263,85 @@ void MESSAGE_RT_RECEIVE::set_gps_disable(bool enable)
     }
 #endif
 }
+
+void MESSAGE_RT_RECEIVE::inject_external_yaw()
+{
+#if HAL_VISUALODOM_ENABLED
+    const uint32_t now_ms = AP_HAL::millis();
+
+    // 最近必须收到过主飞控数据
+    if (!healthy()) {
+        return;
+    }
+
+    // yaw 必须有效
+    if ((flags & FLAG_YAW_VALID) == 0) {
+        return;
+    }
+
+    auto *viso = AP::visualodom();
+    if (viso == nullptr || !viso->enabled()) {
+        static uint32_t last_warn_ms = 0;
+        if (now_ms - last_warn_ms >= 2000) {
+            gcs().send_text(MAV_SEVERITY_WARNING,
+                            "EXT_YAW: visualodom not enabled (set VISO_TYPE=1)");
+            last_warn_ms = now_ms;
+        }
+        return;
+    }
+
+    // 50Hz 注入一次即可
+    static uint32_t last_yaw_inject_ms = 0;
+    if (now_ms - last_yaw_inject_ms < 20) {
+        return;
+    }
+    last_yaw_inject_ms = now_ms;
+
+    // 用测试飞控自身 roll/pitch，叠加主飞控发来的 yaw
+    AP_AHRS &ahrs = AP::ahrs();
+    const float roll = ahrs.get_roll();
+    const float pitch = ahrs.get_pitch();
+    const float yaw_rad = radians(yaw_deg);
+
+    // 这里不想让 ExternalNav 位置影响当前 GPS 位置源，所以位置给 0，
+    // 同时把位置误差给很大，只突出 yaw 的作用
+    constexpr float x = 0.0f;
+    constexpr float y = 0.0f;
+    constexpr float z = 0.0f;
+    constexpr float posErr = 100.0f;       // 很大，表示位置不可信
+    const float angErr = radians(5.0f);    // yaw 误差 5 度，可再调
+    constexpr uint8_t reset_counter = 0;
+    constexpr int8_t quality = 100;
+
+    viso->handle_pose_estimate(
+        0,              // remote_time_us
+        now_ms,         // local time_ms
+        x, y, z,
+        roll, pitch, yaw_rad,
+        posErr,
+        angErr,
+        reset_counter,
+        quality
+    );
+
+    static uint32_t last_dbg_ms = 0;
+    if (now_ms - last_dbg_ms >= 1000) {
+        gcs().send_text(MAV_SEVERITY_INFO,
+                        "EXT_YAW yaw=%.1f roll=%.1f pitch=%.1f",
+                        yaw_deg,
+                        degrees(roll),
+                        degrees(pitch));
+        last_dbg_ms = now_ms;
+    }
+#else
+    static uint32_t last_warn_ms = 0;
+    const uint32_t now_ms = AP_HAL::millis();
+    if (now_ms - last_warn_ms >= 2000) {
+        gcs().send_text(MAV_SEVERITY_WARNING,
+                        "EXT_YAW: HAL_VISUALODOM not enabled in build");
+        last_warn_ms = now_ms;
+    }
+#endif
+}
+
+

@@ -19,9 +19,12 @@ public:
     float get_yaw_deg() const { return yaw_deg; }
     float get_velN_mps() const { return velN_mps; }
     float get_velE_mps() const { return velE_mps; }
+    float get_main_loc_lat() const { return main_loc_lat; }
+    float get_main_loc_lon() const { return main_loc_lon; }
     uint32_t get_last_rx_ms() const { return last_rx_ms; }
     bool get_gps_disable_req() const { return gps_disable_req; }
     bool get_gps_disable_applied() const { return gps_disable_applied; }
+    void inject_external_yaw();
 
 private:
     static constexpr uint8_t HEAD0 = 0x5A;
@@ -46,6 +49,11 @@ private:
     float yaw_deg = 0.0f;
     float velN_mps = 0.0f;
     float velE_mps = 0.0f;
+
+    float main_loc_lat = 0.0f;
+    float main_loc_lon = 0.0f;
+
+
     uint8_t flags = 0;
 
     bool gps_disable_req = false;
