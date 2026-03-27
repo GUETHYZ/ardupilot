@@ -213,9 +213,8 @@ private:
     MY_LINS313 my_LINS313;
     MY_LINS313_SEND my_LINS313_send;
     GPS_RECEIVE gps_receive;
-    GPS_SEND gps_send;
-    MESSAGE_RT_RECEIVE message_rt_receive ;
-
+    MESSAGE_RT_RECEIVE message_rt_receive;
+    GPS_SEND gps_send{&message_rt_receive};
     // scaled roll limit based on pitch
     int32_t roll_limit_cd;
     float pitch_limit_min;

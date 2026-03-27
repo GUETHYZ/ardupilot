@@ -704,17 +704,19 @@ struct PACKED log_LDC
 
 struct PACKED log_GPEK_TEST
 {
-  LOG_PACKET_HEADER;
-  uint64_t time_us;
-  float remote_lat;
-  float remote_lon;
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
 
-  float main_lat;
-  float main_lon;
+    int32_t remote_lat_e7;
+    int32_t remote_lon_e7;
+    int32_t main_lat_e7;
+    int32_t main_lon_e7;
 
+    float remote_n;
+    float remote_e;
+    float main_n;
+    float main_e;
 };
-
-
 
 
 
@@ -1271,8 +1273,8 @@ struct PACKED log_GPEK_TEST
       "LINS",  "Qfff",      "TimeUS,Roll,Pitch,Yaw", "sddd", "FBBB" },\
     { LOG_LDC_MSG, sizeof(log_LDC), \
       "LDC",  "Qfffffffffff",      "TimeUS,LRoll,LPitch,LYaw,DRoll,DPitch,DYaw,ARoll,APitch,AYaw,Errorrp,Erroryaw", "sddddddddddd", "FBBBBBBBBBBB" },\
-    { LOG_GPEK_TEST, sizeof(log_GPEK_TEST), \
-      "GPEK",  "Qfffffff",      "TimeUS,RemoteLat,RemoteLon,MainLat,MainLon", "sdddddd", "FBBBBBB" },\
+{ LOG_GPEK_TEST, sizeof(log_GPEK_TEST), \
+        "GPEK", "Qiiiiffff",    "TimeUS,RemoteLatE7,RemoteLonE7,MainLatE7,MainLonE7,RemoteN,RemoteE,MainN,MainE", "s--------", "F--------" }, \
       LOG_STRUCTURE_FROM_GPS \
     { LOG_MESSAGE_MSG, sizeof(log_Message), \
       "MSG",  "QZ",     "TimeUS,Message", "s-", "F-"}, \

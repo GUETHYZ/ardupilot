@@ -6,15 +6,12 @@
 #include <AP_SerialManager/AP_SerialManager.h>
 #include <AP_Logger/AP_Logger.h>
 
-
-
-extern const AP_HAL::HAL& hal;
+extern const AP_HAL::HAL &hal;
 
 AP_AHRS &ahrs = AP::ahrs();
-
 Location loc;
 
-GPS_SEND::GPS_SEND(MESSAGE_RT_RECEIVE* msg_rt) :  // 新构造函数
+GPS_SEND::GPS_SEND(MESSAGE_RT_RECEIVE *msg_rt) :
     uart(nullptr),
     msg_rt_receive(msg_rt)
 {
@@ -26,8 +23,7 @@ void GPS_SEND::init()
 
     uart = sm.find_serial(AP_SerialManager::SerialProtocol_MESSAGE_RT, 0);
 
-    if (uart == nullptr)
-    {
+    if (uart == nullptr) {
         gcs().send_text(MAV_SEVERITY_INFO, "EKF_SEND UART FAIL");
         return;
     }
@@ -42,46 +38,38 @@ void GPS_SEND::update()
     }
 
     const uint32_t now_ms = AP_HAL::millis();
-
     if (now_ms - last_send_ms < send_interval_ms) {
         return;
     }
-
     last_send_ms = now_ms;
 
     static uint32_t last_no_location_print_ms = 0;
     static uint32_t last_pos_print_ms = 0;
     static uint32_t last_partial_print_ms = 0;
+    //static uint32_t last_null_ptr_print_ms = 0;
     static bool last_location_valid = false;
 
-
-    if (!ahrs.get_location(loc))
-    {
-        if (now_ms - last_no_location_print_ms > 1000)
-        {
+    if (!ahrs.get_location(loc)) {
+        if (now_ms - last_no_location_print_ms > 1000) {
             gcs().send_text(MAV_SEVERITY_INFO, "EKF NO LOCATION");
             last_no_location_print_ms = now_ms;
         }
-
         last_location_valid = false;
         return;
     }
 
-    if (!last_location_valid)
-    {
+    if (!last_location_valid) {
         gcs().send_text(
             MAV_SEVERITY_INFO,
             "EKF LOCATION READY lat=%.6f lon=%.6f alt=%.2f",
             loc.lat * 1e-7f,
             loc.lng * 1e-7f,
-            loc.alt * 0.01f
-        );
+            loc.alt * 0.01f);
         last_location_valid = true;
     }
 
     Vector3f velNED;
-    if (!ahrs.get_velocity_NED(velNED))
-    {
+    if (!ahrs.get_velocity_NED(velNED)) {
         velNED.zero();
     }
 
@@ -93,22 +81,6 @@ void GPS_SEND::update()
     data[4] = velNED.x;
     data[5] = velNED.y;
     data[6] = velNED.z;
-
-    if (now_ms - last_pos_print_ms > 1000)
-    {
-        gcs().send_text(
-            MAV_SEVERITY_INFO,
-            "EKF_POS lat=%.6f lon=%.6f alt=%.2f vN=%.2f vE=%.2f vD=%.2f",
-            data[1],
-            data[2],
-            data[3],
-            data[4],
-            data[5],
-            data[6]
-        );
-
-        last_pos_print_ms = now_ms;
-    }
 
     uint8_t buf[31];
     buf[0] = 0xAA;
@@ -129,19 +101,38 @@ void GPS_SEND::update()
     buf[30] = (uint8_t)(~sum);
 
     const size_t written = uart->write(buf, sizeof(buf));
+    if (msg_rt_receive != nullptr) {
+        main_loc_lat_e7 = msg_rt_receive->get_from_main_loc_lat_e7();
+        main_loc_lon_e7 = msg_rt_receive->get_from_main_loc_lon_e7();
+    } else {
+        main_loc_lat_e7 = 0;
+        main_loc_lon_e7 = 0;
+    }
+    if (now_ms - last_pos_print_ms > 1000) 
+    {
+        gcs().send_text(
+            MAV_SEVERITY_INFO,
+            "EKF_POS lat=%.6f lon=%.6f alt=%.2f vN=%.2f vE=%.2f vD=%.2f",
+            data[1], data[2], data[3], data[4], data[5], data[6]);
+
+        gcs().send_text(
+            MAV_SEVERITY_INFO,
+            "GPS_SEND main_lat=%.7f main_lon=%.7f",
+            main_loc_lat_e7 * 1e-7f,
+            main_loc_lon_e7 * 1e-7f);
+
+        last_pos_print_ms = now_ms;
+    }
 
     log_comparison(AP_HAL::micros64());
-    
-    if (written != sizeof(buf))
-    {
-        if (now_ms - last_partial_print_ms > 1000)
-        {
+
+    if (written != sizeof(buf)) {
+        if (now_ms - last_partial_print_ms > 1000) {
             gcs().send_text(
                 MAV_SEVERITY_WARNING,
                 "EKF_SEND PARTIAL %u/%u",
                 (unsigned)written,
-                (unsigned)sizeof(buf)
-            );
+                (unsigned)sizeof(buf));
             last_partial_print_ms = now_ms;
         }
     }
@@ -162,26 +153,46 @@ void GPS_SEND::float_to_be_bytes(float value, uint8_t bytes[4]) const
     bytes[2] = (u.i >> 8) & 0xFF;
     bytes[3] = u.i & 0xFF;
 }
-
-
-
 void GPS_SEND::log_comparison(uint64_t time_us)
 {
-    #if HAL_LOGGING_ENABLED
-    
-    struct log_GPEK_TEST pkt = 
-    {
-        LOG_PACKET_HEADER_INIT(LOG_GPEK_TEST), // 初始化包头
-        remote_lat : loc.lat * 1e-7f, // 转换为度
-        remote_lon : loc.lng * 1e-7f, // 转换为度
+#if HAL_LOGGING_ENABLED
+    static bool ref_inited = false;
+    static int32_t ref_lat_e7 = 0;
+    static int32_t ref_lon_e7 = 0;
 
-        main_lat :  msg_rt_receive->get_main_loc_lat(),  // 从 MESSAGE_RT_RECEIVE 获取主飞控位置,
-        main_lon :  msg_rt_receive->get_main_loc_lon(), // 从 MESSAGE_RT_RECEIVE 获取主飞控位置,
+    if (!ref_inited) {
+        ref_lat_e7 = loc.lat;
+        ref_lon_e7 = loc.lng;
+        ref_inited = true;
+    }
 
+    const float ref_lat_deg = ref_lat_e7 * 1e-7f;
+    const float lat_scale = 111319.5f;
+    const float lon_scale = 111319.5f * cosf(radians(ref_lat_deg));
+
+    const float remote_n = (loc.lat - ref_lat_e7) * 1e-7f * lat_scale;
+    const float remote_e = (loc.lng - ref_lon_e7) * 1e-7f * lon_scale;
+
+    float main_n = 0.0f;
+    float main_e = 0.0f;
+    if (main_loc_lat_e7 != 0 || main_loc_lon_e7 != 0) {
+        main_n = (main_loc_lat_e7 - ref_lat_e7) * 1e-7f * lat_scale;
+        main_e = (main_loc_lon_e7 - ref_lon_e7) * 1e-7f * lon_scale;
+    } 
+
+    struct log_GPEK_TEST pkt = {
+        LOG_PACKET_HEADER_INIT(LOG_GPEK_TEST),
+        time_us       : time_us,
+        remote_lat_e7 : loc.lat,
+        remote_lon_e7  : loc.lng,
+        main_lat_e7   : main_loc_lat_e7,
+        main_lon_e7   : main_loc_lon_e7,
+        remote_n      : remote_n,
+        remote_e      : remote_e,
+        main_n        : main_n,
+        main_e        : main_e,
     };
+
     AP::logger().WriteBlock(&pkt, sizeof(pkt));
-    
 #endif
-
-
 }

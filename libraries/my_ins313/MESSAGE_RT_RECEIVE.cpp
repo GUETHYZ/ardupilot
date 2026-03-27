@@ -119,31 +119,30 @@ float MESSAGE_RT_RECEIVE::be_bytes_to_float(const uint8_t bytes[4])
 
 void MESSAGE_RT_RECEIVE::handle_packet()
 {
-    peer_boot_ms     = be_bytes_to_u32(&payload[0]);
-    groundspeed_mps  = be_bytes_to_float(&payload[4]);
-    yaw_deg          = be_bytes_to_float(&payload[8]);
-    main_loc_lat     = be_bytes_to_float(&payload[12]);
-    main_loc_lon     = be_bytes_to_float(&payload[16]);
-    flags            = payload[20];
-    last_rx_ms       = AP_HAL::millis();
-    gps_disable_req  = (flags & FLAG_GPS_DISABLE_REQ) != 0;
+    peer_boot_ms        = be_bytes_to_u32(&payload[0]);
+    groundspeed_mps     = be_bytes_to_float(&payload[4]);
+    yaw_deg             = be_bytes_to_float(&payload[8]);
+    from_main_loc_lat_e7 = be_bytes_to_i32(&payload[12]);
+    from_main_loc_lon_e7 = be_bytes_to_i32(&payload[16]);
+    flags               = payload[20];
+    last_rx_ms          = AP_HAL::millis();
+    gps_disable_req     = (flags & FLAG_GPS_DISABLE_REQ) != 0;
 
     static uint32_t last_print_ms = 0;
     if (last_rx_ms - last_print_ms >= 1000) {
         gcs().send_text(
             MAV_SEVERITY_INFO,
-            "MSGRT_RECV gs=%.2f yaw=%.1f lat=%.2f lon=%.2f flg=0x%02X h=%u gps_dis=%u",
+            "MSGRT_RECV gs=%.2f yaw=%.1f lat=%.7f lon=%.7f flg=0x%02X h=%u gps_dis=%u",
             groundspeed_mps,
             yaw_deg,
-            main_loc_lat,
-            main_loc_lon,
+            from_main_loc_lat_e7 * 1e-7f,
+            from_main_loc_lon_e7 * 1e-7f,
             (unsigned)flags,
             healthy() ? 1U : 0U,
             gps_disable_req ? 1U : 0U);
         last_print_ms = last_rx_ms;
     }
 }
-
 void MESSAGE_RT_RECEIVE::inject_virtual_airspeed()
 {
 #if AP_AIRSPEED_ENABLED && AP_AIRSPEED_EXTERNAL_ENABLED
@@ -344,4 +343,11 @@ void MESSAGE_RT_RECEIVE::inject_external_yaw()
 #endif
 }
 
-
+int32_t MESSAGE_RT_RECEIVE::be_bytes_to_i32(const uint8_t bytes[4])
+{
+    return int32_t(
+        (uint32_t(bytes[0]) << 24) |
+        (uint32_t(bytes[1]) << 16) |
+        (uint32_t(bytes[2]) << 8)  |
+        uint32_t(bytes[3]));
+}
