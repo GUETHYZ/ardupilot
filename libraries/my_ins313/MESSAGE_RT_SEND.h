@@ -28,12 +28,13 @@ private:
     uint32_t send_interval_ms = 50;   // 20Hz
 
     static void u32_to_be_bytes(uint32_t value, uint8_t bytes[4]);
+    static void i32_to_be_bytes(int32_t value, uint8_t bytes[4]);
     static void float_to_be_bytes(float value, uint8_t bytes[4]);
 
     bool send_packet(uint32_t boot_ms,
                      float groundspeed_mps,
                      float yaw_deg,
-                     float velN_mps,
-                     float velE_mps,
+                     int32_t main_lat_e7,
+                     int32_t main_lon_e7,
                      uint8_t flags);
 };
