@@ -586,6 +586,39 @@ public:
     void clear_RTCMV3();
 #endif // GPS_MOVING_BASELINE
 
+
+// 添加
+    void set_gps_lost_status(bool status) {
+        gps_lost_status = status;
+    } 
+    bool get_gps_lost_status() {return gps_lost_status;}
+
+    Location get_gps_real_location(void) {return gps_location;}
+    
+    void set_gps_had_vbn_data(bool status) {gps_had_vbn_data = status;}
+
+    void set_gps_lost_update_error(bool status) {gps_lost_update_error = status;}
+    bool get_gps_lost_update_error() {return gps_lost_update_error;}
+
+    void set_gps_use_optical_status(bool status) {gps_use_optical_status = status;} 
+    bool get_gps_use_optical_status() {return gps_use_optical_status;}
+
+    void set_gps_use_ext_gnss_status(bool status) {gps_use_ext_gnss_status = status;} 
+    bool get_gps_use_ext_gnss_status() {return gps_use_ext_gnss_status;}
+    
+
+    Location get_gps_shield_location(void) {return sw_gps_location;}
+
+    bool get_gps_had_new_data_update(void) {return gps_had_new_data_update;}
+    void set_gps_had_new_data_update(bool status) {gps_had_new_data_update = status;}
+
+    
+    bool get_gps_start_status() {return gps_had_start;}
+
+    void set_gps_noise_status(bool status) {gps_noise_status = status;} 
+    bool get_gps_noise_status() {return gps_noise_status;}
+
+
 protected:
 
     // configuration parameters
@@ -705,6 +738,55 @@ private:
     AP_GPS_Backend *_detect_instance(uint8_t instance);
 
     void update_instance(uint8_t instance);
+
+//====================添加===========================//
+    bool gps_lost_status = false;
+    bool old_gps_lost_status = false;
+    bool gps_had_vbn_data = false;
+    bool gps_had_start = false;
+    bool gps_lost_update_error = false;
+
+    GPS_timing timing_map;
+    GPS_State state_map;
+
+    uint32_t map_gps_update_time_ms = 0;
+    uint32_t map_gps_log_time_ms = 0;
+    uint32_t ext_gps_log_time_ms = 0;
+    uint32_t map_gps_pop_time_ms = 0;
+    bool gps_noise_status = false;
+    bool gps_use_optical_status = false; 
+    bool gps_use_ext_gnss_status = false;//Temporarily effective in external GPS status
+    bool gps_deception_interference_status = false;
+    Vector3f optical_flow_velocity;
+    Location last;
+    Location original_map;
+    Location vbn_map;
+    Location gps_location;
+    uint8_t  gps_now_num;
+    Location sw_gps_location;
+    Vector3f last_velocity;
+    bool vbn_first_data_push = false;
+    int32_t map_gps_updata_delay_time_us;
+    // the time we got our last message in system milliseconds
+    uint32_t map_last_message_time_ms;
+    uint32_t optical_flow_velocity_update_time_ms = 0;
+
+    bool vbn_new_data_update = false;
+
+    bool gps_had_new_data_update = false;
+
+    float differential_of_gps_num = 0.0f;
+    uint32_t gps_deception_interference_time_ms = 0;
+    float gps_deception_interference_time_dt = 0;
+    int  gps_deception_interference_num_error = 0;
+    uint8_t  gps_deception_interference_last_num = 0;
+    float ground_speed_camera;                 ///< ground speed in m/s
+    bool gps_jamming_start_enable = false;
+    uint32_t gps_jamming_start_time_ms = 0;
+
+    GPS_Status gps_deception_interference_old_status;                  ///< driver older fix status
+//====================结束===========================//
+
 
     /*
       buffer for re-assembling RTCM data for GPS injection.

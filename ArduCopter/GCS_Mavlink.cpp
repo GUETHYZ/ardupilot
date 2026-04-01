@@ -637,6 +637,7 @@ void GCS_MAVLINK_Copter::packetReceived(const mavlink_status_t &status,
     copter.g2.follow.handle_msg(msg);
 #endif
     GCS_MAVLINK::packetReceived(status, msg);
+    
 }
 
 bool GCS_MAVLINK_Copter::params_ready() const

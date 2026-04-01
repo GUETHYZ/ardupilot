@@ -76,6 +76,9 @@
 
 #include <stdio.h>
 
+
+#include <my_ins313/SW_opticalflow.h>
+
 #if HAL_RCINPUT_WITH_AP_RADIO
 #include <AP_Radio/AP_Radio.h>
 #include <AP_BoardConfig/AP_BoardConfig.h>
@@ -1723,34 +1726,165 @@ void GCS_MAVLINK::send_message(enum ap_message id)
     pushed_ap_message_ids.set(id);
 }
 
+
+// void GCS_MAVLINK::packetReceived(const mavlink_status_t &status,
+//                                  const mavlink_message_t &msg)
+// {
+//     // we exclude radio packets because we historically used this to
+//     // make it possible to use the CLI over the radio
+//     if (msg.msgid != MAVLINK_MSG_ID_RADIO && msg.msgid != MAVLINK_MSG_ID_RADIO_STATUS) {
+//         mavlink_active |= (1U<<(chan-MAVLINK_COMM_0));
+//     }
+//     const auto mavlink_protocol = uartstate->get_protocol();
+//     if (!(status.flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1) &&
+//         (status.flags & MAVLINK_STATUS_FLAG_OUT_MAVLINK1) &&
+//         (mavlink_protocol == AP_SerialManager::SerialProtocol_MAVLink2 ||
+//          mavlink_protocol == AP_SerialManager::SerialProtocol_MAVLinkHL)) {
+//         // if we receive any MAVLink2 packets on a connection
+//         // currently sending MAVLink1 then switch to sending
+//         // MAVLink2
+//         _channel_status.flags &= ~MAVLINK_STATUS_FLAG_OUT_MAVLINK1;
+//     }
+//     if (!routing.check_and_forward(*this, msg)) {
+//         // the routing code has indicated we should not handle this packet locally
+//         return;
+//     }
+//     if (msg.msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
+// #if HAL_MOUNT_ENABLED
+//         // allow mounts to see the location of other vehicles
+//         handle_mount_message(msg);
+// #endif
+//     }
+// #if AP_SCRIPTING_ENABLED
+//     {
+//         AP_Scripting *scripting = AP_Scripting::get_singleton();
+//         if (scripting != nullptr) {
+//             scripting->handle_message(msg, chan);
+//         }
+//     }
+// #endif // AP_SCRIPTING_ENABLED
+//     if (!accept_packet(status, msg)) {
+//         // e.g. enforce-sysid says we shouldn't look at this packet
+//         return;
+//     }
+//     handle_message(msg);
+// }
+
+static void request_message_interval(mavlink_channel_t chan,
+                                     uint8_t target_sysid,
+                                     uint8_t target_compid,
+                                     uint32_t msg_id,
+                                     int32_t interval_us)
+{
+    mavlink_msg_command_long_send(
+        chan,
+        target_sysid,
+        target_compid,
+        MAV_CMD_SET_MESSAGE_INTERVAL,
+        0,              // confirmation
+        msg_id,         // param1: message id
+        interval_us,    // param2: interval in us
+        0, 0, 0, 0, 0
+    );
+}
 void GCS_MAVLINK::packetReceived(const mavlink_status_t &status,
                                  const mavlink_message_t &msg)
 {
-    // we exclude radio packets because we historically used this to
-    // make it possible to use the CLI over the radio
-    if (msg.msgid != MAVLINK_MSG_ID_RADIO && msg.msgid != MAVLINK_MSG_ID_RADIO_STATUS) {
-        mavlink_active |= (1U<<(chan-MAVLINK_COMM_0));
+    if (msg.msgid != MAVLINK_MSG_ID_RADIO &&
+        msg.msgid != MAVLINK_MSG_ID_RADIO_STATUS) {
+        mavlink_active |= (1U << (chan - MAVLINK_COMM_0));
     }
+
     const auto mavlink_protocol = uartstate->get_protocol();
     if (!(status.flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1) &&
         (status.flags & MAVLINK_STATUS_FLAG_OUT_MAVLINK1) &&
         (mavlink_protocol == AP_SerialManager::SerialProtocol_MAVLink2 ||
          mavlink_protocol == AP_SerialManager::SerialProtocol_MAVLinkHL)) {
-        // if we receive any MAVLink2 packets on a connection
-        // currently sending MAVLink1 then switch to sending
-        // MAVLink2
         _channel_status.flags &= ~MAVLINK_STATUS_FLAG_OUT_MAVLINK1;
     }
+
+#ifdef MOSS_VIO_MCU
+    const uint32_t now = AP_HAL::millis();
+
+    // 1) 先恢复最基本的探测输出
+    // if (msg.msgid == MAVLINK_MSG_ID_HEARTBEAT ||
+    //     msg.msgid == MAVLINK_MSG_ID_ATTITUDE ||
+    //     msg.msgid == MAVLINK_MSG_ID_GPS_RAW_INT ||
+    //     msg.msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT ||
+    //     msg.msgid == MAVLINK_MSG_ID_COMMAND_ACK) {
+
+    //     gcs().send_text(MAV_SEVERITY_INFO,
+    //                     "EARLY RX ch=%u sys=%u comp=%u msgid=%u",
+    //                     (unsigned)chan,
+    //                     (unsigned)msg.sysid,
+    //                     (unsigned)msg.compid,
+    //                     (unsigned)msg.msgid);
+    // }
+
+    // 2) 请求逻辑不要依赖 sw_device 是否为空
+    static uint32_t last_req_ms = 0;
+
+    if (chan == MAVLINK_COMM_2 &&
+        msg.sysid == 1 &&
+        msg.compid == 1 &&
+        msg.msgid == MAVLINK_MSG_ID_HEARTBEAT &&
+        (now - last_req_ms > 2000)) {
+
+        last_req_ms = now;
+
+        // gcs().send_text(MAV_SEVERITY_INFO,
+        //                 "REQ ch=%u sys=%u comp=%u",
+        //                 (unsigned)chan,
+        //                 (unsigned)msg.sysid,
+        //                 (unsigned)msg.compid);
+
+        request_message_interval(chan, msg.sysid, msg.compid,
+                                 MAVLINK_MSG_ID_ATTITUDE, 50000);              // 20Hz
+        request_message_interval(chan, msg.sysid, msg.compid,
+                                 MAVLINK_MSG_ID_GPS_RAW_INT, 100000);          // 10Hz
+        request_message_interval(chan, msg.sysid, msg.compid,
+                                 MAVLINK_MSG_ID_GLOBAL_POSITION_INT, 100000);  // 10Hz
+    }
+
+    // 3) 只把 handler 调用依赖在 sw_device 上
+    SW_opticalflow_driver *sw_device = AP::opticalflow_driver();
+
+    static uint32_t last_null_dbg_ms = 0;
+    if (sw_device == nullptr) {
+        if (now - last_null_dbg_ms > 2000) {
+            last_null_dbg_ms = now;
+            gcs().send_text(MAV_SEVERITY_WARNING, "opticalflow_driver null");
+        }
+    } else {
+        switch (msg.msgid) {
+        case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
+            sw_device->handle_vbn_mcu_pos_message(msg);
+            break;
+
+        case MAVLINK_MSG_ID_ATTITUDE:
+            sw_device->handle_vbn_mcu_attitude_message(msg);
+            break;
+
+        case MAVLINK_MSG_ID_GPS_RAW_INT:
+            sw_device->handle_vbn_mcu_gps_raw_message(msg);
+            break;
+
+        default:
+            break;
+        }
+    }
+#endif
+
     if (!routing.check_and_forward(*this, msg)) {
-        // the routing code has indicated we should not handle this packet locally
         return;
     }
+
     if (msg.msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
 #if HAL_MOUNT_ENABLED
-        // allow mounts to see the location of other vehicles
         handle_mount_message(msg);
 #endif
     }
+
 #if AP_SCRIPTING_ENABLED
     {
         AP_Scripting *scripting = AP_Scripting::get_singleton();
@@ -1758,16 +1892,181 @@ void GCS_MAVLINK::packetReceived(const mavlink_status_t &status,
             scripting->handle_message(msg, chan);
         }
     }
-#endif // AP_SCRIPTING_ENABLED
+#endif
+
     if (!accept_packet(status, msg)) {
-        // e.g. enforce-sysid says we shouldn't look at this packet
         return;
     }
+
     handle_message(msg);
 }
 
-void
-GCS_MAVLINK::update_receive(uint32_t max_time_us)
+
+// void GCS_MAVLINK::packetReceived(const mavlink_status_t &status,
+//                                  const mavlink_message_t &msg)
+// {
+//     // we exclude radio packets because we historically used this to
+//     // make it possible to use the CLI over the radio
+//     if (msg.msgid != MAVLINK_MSG_ID_RADIO && msg.msgid != MAVLINK_MSG_ID_RADIO_STATUS) {
+//         mavlink_active |= (1U << (chan - MAVLINK_COMM_0));
+//     }
+
+//     const auto mavlink_protocol = uartstate->get_protocol();
+//     if (!(status.flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1) &&
+//         (status.flags & MAVLINK_STATUS_FLAG_OUT_MAVLINK1) &&
+//         (mavlink_protocol == AP_SerialManager::SerialProtocol_MAVLink2 ||
+//             mavlink_protocol == AP_SerialManager::SerialProtocol_MAVLinkHL)) 
+//     {
+//         // if we receive any MAVLink2 packets on a connection
+//         // currently sending MAVLink1 then switch to sending
+//         // MAVLink2
+//         _channel_status.flags &= ~MAVLINK_STATUS_FLAG_OUT_MAVLINK1;
+//     }
+
+//     /*
+//         自定义前置解析：
+//         放在 routing / accept_packet 之前，
+//         这样即使原有转发逻辑或 target id 过滤导致本地不继续处理，
+//         可以先拿到这几类消息做解析。
+//         这里只做“旁路解析”，不能替代原有处理链。
+//     */
+// #ifdef MOSS_VIO_MCU
+//     if (SW_opticalflow_driver *sw_device = AP::opticalflow_driver()) {
+
+//         // -----------------------------
+//         // 主动向载体飞控请求消息频率
+//         // 按你目前实验日志，载体飞控来源是：
+//         // chan = 2, sysid = 1, compid = 1
+//         // 如果后面这些值变了，这里也要同步改
+//         // -----------------------------
+//         static uint32_t last_req_ms = 0;
+//         static uint32_t last_att_ms = 0;
+//         static uint32_t last_gps_raw_ms = 0;
+//         static uint32_t last_gpos_ms = 0;
+
+//         const uint32_t now = AP_HAL::millis();
+
+//         // 记录三个目标消息最近一次收到的时间
+//         switch (msg.msgid) {
+//         case MAVLINK_MSG_ID_ATTITUDE:
+//             if (chan == MAVLINK_COMM_2 && msg.sysid == 1 && msg.compid == 1) {
+//                 last_att_ms = now;
+//             }
+//             break;
+
+//         case MAVLINK_MSG_ID_GPS_RAW_INT:
+//             if (chan == MAVLINK_COMM_2 && msg.sysid == 1 && msg.compid == 1) {
+//                 last_gps_raw_ms = now;
+//             }
+//             break;
+
+//         case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
+//             if (chan == MAVLINK_COMM_2 && msg.sysid == 1 && msg.compid == 1) {
+//                 last_gpos_ms = now;
+//             }
+//             break;
+
+//         default:
+//             break;
+//         }
+
+//         // 收到载体飞控 HEARTBEAT 后，如果三个目标消息里有缺失/超时，则重发请求
+//         if (msg.msgid == MAVLINK_MSG_ID_HEARTBEAT &&
+//             chan == MAVLINK_COMM_2 &&
+//             msg.sysid == 1 &&
+//             msg.compid == 1) {
+
+//             const bool att_stale = (now - last_att_ms) > 3000;
+//             const bool gps_raw_stale = (now - last_gps_raw_ms) > 3000;
+//             const bool gpos_stale = (now - last_gpos_ms) > 3000;
+
+//             if ((att_stale || gps_raw_stale || gpos_stale) &&
+//                 (now - last_req_ms) > 2000) {
+//                 last_req_ms = now;
+
+//                 // ATTITUDE -> 20Hz
+//                 request_message_interval(chan,
+//                                          msg.sysid,
+//                                          msg.compid,
+//                                          MAVLINK_MSG_ID_ATTITUDE,
+//                                          50000);
+
+//                 // GPS_RAW_INT -> 10Hz
+//                 request_message_interval(chan,
+//                                          msg.sysid,
+//                                          msg.compid,
+//                                          MAVLINK_MSG_ID_GPS_RAW_INT,
+//                                          100000);
+
+//                 // GLOBAL_POSITION_INT -> 10Hz
+//                 request_message_interval(chan,
+//                                          msg.sysid,
+//                                          msg.compid,
+//                                          MAVLINK_MSG_ID_GLOBAL_POSITION_INT,
+//                                          100000);
+
+//                 gcs().send_text(MAV_SEVERITY_INFO,
+//                                  "REQ INTVL sys=%u comp=%u ch=%u",
+//                                  (unsigned)msg.sysid,
+//                                  (unsigned)msg.compid,
+//                                  (unsigned)chan);
+//             }
+//         }
+
+//         // -----------------------------
+//         // 旁路解析三个消息
+//         // 不影响后面的正常 MAVLink 处理链
+//         // -----------------------------
+//         switch (msg.msgid) {
+//         case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
+//             sw_device->handle_vbn_mcu_pos_message(msg);
+//             break;
+
+//         case MAVLINK_MSG_ID_ATTITUDE:
+//             sw_device->handle_vbn_mcu_attitude_message(msg);
+//             break;
+
+//         case MAVLINK_MSG_ID_GPS_RAW_INT:
+//             sw_device->handle_vbn_mcu_gps_raw_message(msg);
+//             break;
+
+//         default:
+//             break;
+//         }
+//     }
+// #endif
+
+//     if (!routing.check_and_forward(*this, msg)) {
+//         // the routing code has indicated we should not handle this packet locally
+//         return;
+//     }
+
+//     if (msg.msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
+// #if HAL_MOUNT_ENABLED
+//         // allow mounts to see the location of other vehicles
+//         handle_mount_message(msg);
+// #endif
+//     }
+
+// #if AP_SCRIPTING_ENABLED
+//     {
+//         AP_Scripting *scripting = AP_Scripting::get_singleton();
+//         if (scripting != nullptr) {
+//             scripting->handle_message(msg, chan);
+//         }
+//     }
+// #endif // AP_SCRIPTING_ENABLED
+
+//     if (!accept_packet(status, msg)) {
+//         // e.g. enforce-sysid says we shouldn't look at this packet
+//         return;
+//     }
+
+//     handle_message(msg);
+// }
+
+
+void GCS_MAVLINK::update_receive(uint32_t max_time_us)
 {
     // do absolutely nothing if we are locked
     if (locked()) {

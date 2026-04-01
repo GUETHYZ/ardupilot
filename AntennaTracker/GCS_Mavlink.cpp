@@ -344,6 +344,7 @@ void GCS_MAVLINK_Tracker::packetReceived(const mavlink_status_t &status,
         return;
     }
 
+
     switch (msg.msgid) {
     case MAVLINK_MSG_ID_HEARTBEAT:
     {
@@ -368,8 +369,10 @@ void GCS_MAVLINK_Tracker::packetReceived(const mavlink_status_t &status,
         tracker.tracking_update_pressure(packet);
         break;
     }
+
     }
     GCS_MAVLINK::packetReceived(status, msg);
+
 }
 
 // locks onto a particular target sysid and sets it's position data stream to at least 1hz
